@@ -1,0 +1,22 @@
+﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karte</title>
+    <script>
+        function updateImage() {
+            const img = document.getElementById('mapImage');
+            const timestamp = new Date().getTime(); // Get current timestamp
+            img.src = `images/map.jpg?${timestamp}`; // Append timestamp to the image URL
+        }
+
+        // Update the image every second
+        setInterval(updateImage, 1000);
+    </script>
+</head>
+<body>
+    <h1>Hier ist die durch den SLAM-Algorithmus erstelle Karte:</h1>
+    <img id="mapImage" src="images/map.jpg" alt="SLAM Map" style="max-width: 100%; height: auto;">
+</body>
+</html>

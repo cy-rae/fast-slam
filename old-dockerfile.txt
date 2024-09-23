@@ -1,0 +1,22 @@
+﻿FROM jderobot/robotics-backend:latest
+
+# Bosch Proxy
+ENV http_proxy=http://rb-proxy-de.bosch.com:8080
+ENV https_proxy=http://rb-proxy-de.bosch.com:8080
+
+# Install ssh server
+RUN apt-get update && apt-get install -y openssh-server
+
+# Create ssh directory
+RUN mkdir /var/run/sshd
+
+# Set root password (root:root)
+RUN echo 'root:root' | chpasswd
+
+# Give root rights to access the ssh server
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+
+EXPOSE 22
+
+# Start ssh service
+CMD ["/usr/sbin/sshd", "-D"]
