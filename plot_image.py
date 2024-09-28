@@ -66,20 +66,20 @@ class Robot(Point):
         :param yaw: The angle of the particle in degrees (default is 0.0). Should be a number between 0 and 360.
         """
         super().__init__(x, y)
-        self.yaw = yaw
+        self.yaw: float = yaw
 
     def get_yaw_rad(self):
         """
-        Get the yaw value in radians
+        Get the yaw value / current angle in radians
         :return: Yaw value in radians
         """
         return np.radians(self.yaw)
 
     def move(self, v: float, w: float):
         """
-        Move the particle
-        :param v: The linear velocity
-        :param w: The angular velocity
+        Update the position using the passed linear and angular velocity. The passed values should already include noise.
+        :param v: The linear velocity (including noise)
+        :param w: The angular velocity (including noise)
         """
         self.yaw = (self.yaw + w) % 360  # Ensure yaw stays between 0 and 360
         self.x += v * np.cos(self.get_yaw_rad())
@@ -103,65 +103,6 @@ class Particle(Robot):
         self.weight: float = weight
         # A particle holds a list of landmarks that it has captured. This list represents the map of the particle.
         self.landmarks: list[Landmark] = []
-
-    def update_landmarks(self, captured_landmarks: list[Landmark]):
-        """
-        Update the landmarks of the particle with the passed newly captured landmarks.
-        :param captured_landmarks: The landmarks to update
-        """
-        # Iterate over the newly captured landmarks and update particle's landmarks list
-        for captured_landmark in captured_landmarks:
-            # Check if the newly captured landmark is associated to an existing landmark in the particle's landmarks list.
-            associated_landmark_index: int or None = self.__get_associated_landmark(captured_landmark)
-
-            # If no associated landmark was found, add the captured landmark to the particle's landmarks list.
-            if associated_landmark_index is None:
-                self.landmarks.append(captured_landmark)
-
-            # If an associated landmark was found, update the landmark's position using Kalman update.
-            else:
-                self.__update_landmark(associated_landmark_index, captured_landmark)
-
-    def __get_associated_landmark(self, captured_landmark: Landmark):
-        """
-        Search for an existing landmark in the particle's landmark list that is associated with the passed landmark
-        using mahalanobis distance.
-        :param captured_landmark: A landmark that is associated to this landmark will be searched.
-        :return: Returns None if no landmark can be found. Else, the index of the associated landmark will be returned.
-        """
-        for particle_landmark in self.landmarks:
-            # Calculate the mahalanobis distance between the captured landmark and the particle's landmark
-            delta = captured_landmark.position() - particle_landmark.position()
-            distance = np.sqrt(delta.T @ np.linalg.inv(particle_landmark.covariance_matrix) @ delta)
-
-            # Use cluster radius as threshold for association
-            if distance < MAXIMUM_POINT_DISTANCE:
-                return self.landmarks.index(particle_landmark)
-
-        return None
-
-    def __update_landmark(self, particle_landmark_index: int, captured_landmark: Landmark):
-        """
-        Update the position of the particle's landmark using Kalman filter.
-        :param particle_landmark_index: The index of the particle's landmark that will be updated
-        :param captured_landmark: The captured landmark that will be used to update the particle's landmark
-        """
-        # Get the particle's landmark
-        particle_landmark = self.landmarks[particle_landmark_index]
-
-        # Calculate Kalman filter to enhance the landmark position estimate
-        kalman_filter = particle_landmark.covariance_matrix @ np.linalg.inv(
-            particle_landmark.covariance_matrix + MEASUREMENT_NOISE)
-
-        # Update the landmark's position and covariance matrix using the Kalman filter
-        updated_position = particle_landmark.position() + kalman_filter @ (
-                captured_landmark.position() - particle_landmark.position())
-        updated_covariance = (np.eye(2) - kalman_filter) @ particle_landmark.covariance_matrix
-
-        # Update the particle's landmark with the updated position and covariance matrix
-        updated_x, updated_y = updated_position[0], updated_position[1]
-        self.landmarks[particle_landmark_index] = Landmark(float(updated_x), float(updated_y), updated_covariance)
-        return updated_position, updated_covariance
 
 
 class Map:
@@ -231,12 +172,101 @@ class Map:
             plt.plot(landmark.x, landmark.y, color + 'o')  # 'o' -> circle marker
 
 
+class LandmarkService:
+    """
+    This class provides methods to update landmarks using mahalanobis distance and Kalman filter.
+    """
+
+    @staticmethod
+    def update_landmarks(existing_landmarks: list[Landmark], captured_landmarks: list[Landmark]) -> list[Landmark]:
+        """
+        Update the passed existing landmarks with the passed newly captured landmarks.
+        :param existing_landmarks: The landmarks to update
+        :param captured_landmarks: The newly captured landmarks which will be used to update the existing landmarks
+        :return: Returns a list the updated landmarks
+        """
+        # Iterate over the newly captured landmarks and update particle's landmarks list
+        for captured_landmark in captured_landmarks:
+            # Check if the newly captured landmark is associated to an existing landmark in the particle's landmarks list.
+            associated_landmark_index: int or None = LandmarkService.__get_associated_landmark(existing_landmarks,
+                                                                                               captured_landmark)
+
+            # If no associated landmark was found, add the captured landmark to the particle's landmarks list.
+            if associated_landmark_index is None:
+                existing_landmarks.append(captured_landmark)
+
+            # If an associated landmark was found, update the landmark's position using Kalman update.
+            else:
+                LandmarkService.__update_landmark(existing_landmarks, associated_landmark_index, captured_landmark)
+
+        return existing_landmarks
+
+    @staticmethod
+    def __get_associated_landmark(existing_landmarks: list[Landmark], captured_landmark: Landmark):
+        """
+        Search for a landmark in the existing landmarks list that is associated with the passed captured landmark
+        using mahalanobis distance.
+        :param existing_landmarks: The existing landmarks list
+        :param captured_landmark: A landmark that is associated to this landmark will be searched.
+        :return: Returns None if no landmark can be found. Else, the index of the associated landmark will be returned.
+        """
+        for particle_landmark in existing_landmarks:
+            # Calculate the mahalanobis distance between the captured landmark and the particle's landmark
+            # using the landmark covariance matrix of the particle's landmark
+            distance = LandmarkService.mahalanobis_distance(
+                particle_landmark.position(),
+                captured_landmark.position(),
+                particle_landmark.covariance_matrix
+            )
+
+            # Use cluster radius as threshold for association
+            if distance < MAXIMUM_POINT_DISTANCE:
+                return existing_landmarks.index(particle_landmark)
+
+        return None
+
+    @staticmethod
+    def mahalanobis_distance(position_a: ndarray, position_b: ndarray, covariance_matrix: ndarray) -> float:
+        """
+        Calculate the mahalanobis distance between two points A & B using the passed covariance matrix.
+        :param position_a: The position of point A [x, y]
+        :param position_b: The position of point B [x, y]
+        :param covariance_matrix: The covariance matrix
+        """
+        delta = position_b - position_a
+        distance = np.sqrt(delta.T @ np.linalg.inv(covariance_matrix) @ delta)
+        return distance
+
+    @staticmethod
+    def __update_landmark(existing_landmarks: list[Landmark], particle_landmark_index: int,
+                          captured_landmark: Landmark):
+        """
+        Update the position of the particle's landmark using Kalman filter.
+        :param particle_landmark_index: The index of the particle's landmark that will be updated
+        :param captured_landmark: The captured landmark that will be used to update the particle's landmark
+        """
+        # Get the particle's landmark
+        particle_landmark = existing_landmarks[particle_landmark_index]
+
+        # Calculate Kalman filter to enhance the landmark position estimate
+        kalman_filter = particle_landmark.covariance_matrix @ np.linalg.inv(
+            particle_landmark.covariance_matrix + MEASUREMENT_NOISE)
+
+        # Update the landmark's position and covariance matrix using the Kalman filter
+        updated_position = particle_landmark.position() + kalman_filter @ (
+                captured_landmark.position() - particle_landmark.position())
+        updated_covariance = (np.eye(2) - kalman_filter) @ particle_landmark.covariance_matrix
+
+        # Update the particle's landmark with the updated position and covariance matrix
+        updated_x, updated_y = updated_position[0], updated_position[1]
+        existing_landmarks[particle_landmark_index] = Landmark(float(updated_x), float(updated_y), updated_covariance)
+        return updated_position, updated_covariance
+
+
 class FastSlam:
-    def __init__(self, num_particles: int, weight_threshold: float):
+    def __init__(self):
         """
         Initialize the FastSLAM algorithm by initializing the robot, particles, landmarks, and map.
-        :param num_particles: This is the number of particles to use in the FastSLAM algorithm
-        Thus, the algorithm does not need to handle too many landmarks.
         """
         self.__robot = Robot()
         self.__particles: list[Particle] = [
@@ -245,13 +275,12 @@ class FastSlam:
                 random.uniform(-4.5, 5.5),  # random y value
                 random.uniform(0, 360),  # random yaw value
                 0.0  # default weight of the particle
-            ) for _ in range(num_particles)
+            ) for _ in range(NUM_PARTICLES)
         ]
         self.__obstacles: list[Point] = []
-        self.__landmarks: list[Point] = []
+        self.__landmarks: list[Landmark] = []
         self.__map = Map()
         self.__map.plot_map(self.__robot, self.__particles, self.__obstacles, self.__landmarks)
-        self.__weight_threshold = weight_threshold
 
     def iterate(self, v: float, w: float, laser_data: LaserData):
         """
@@ -261,20 +290,38 @@ class FastSlam:
         :param laser_data: This is the laser data from the robot
         """
         # Move the robot and particles
-        self.__move(v, w)
+        self.__move_particles(v, w)
 
-        # Get the scanned obstacles from the laser data and update the obstacles and landmarks
+        # Get the scanned obstacles from the laser data and update the obstacles to illustrate new borders and obstacles in the map
         scanned_obstacles: list[Point] = self.__get_scanned_obstacles(laser_data)
         self.__update_obstacles(scanned_obstacles)
-        self.__update_landmarks(scanned_obstacles)
-        self.__update_particles()
 
-    def __move(self, v: float, w: float):
+        # Capture landmarks from the scanned obstacles
+        captured_landmarks = self.__capture_landmarks(scanned_obstacles)
+
+        # Update the landmarks of the particles with the captured landmarks
+        for particle in self.__particles:
+            updated_landmarks = LandmarkService.update_landmarks(particle.landmarks, captured_landmarks)
+            particle.landmarks = updated_landmarks
+
+        # Update the actual measured landmarks
+        updated_landmarks = LandmarkService.update_landmarks(self.__landmarks, captured_landmarks)
+        self.__landmarks = updated_landmarks
+
+        # Update the particles with regard to their weights. The weight depends on the likelihood of the particle given the captured landmarks.
+        if len(captured_landmarks) > 0:
+            self.__update_particles(captured_landmarks)
+
+    def __move_particles(self, v: float, w: float):
         """
-        Move the robot and particles
+        Apply the movement to the robot to the particles. The uncertainty of the odometry measurements are taken into account.
         :param v: This is the linear velocity of the robot
         :param w: This is the angular velocity of the robot
         """
+        # Apply uncertainty to the movement of the robot and particles using random Gaussian noise with the standard deviations
+        v += random.gauss(0, TRANSLATION_NOISE)
+        w += random.gauss(0, ROTATION_NOISE)
+
         self.__robot.move(v, w)
         for particle in self.__particles:
             particle.move(v, w)
@@ -303,11 +350,7 @@ class FastSlam:
             obstacle_x = distance * np.cos(np.radians(global_angle))
             obstacle_y = distance * np.sin(np.radians(global_angle))
 
-            # Create new obstacle object and with the rounded coordinate values. The coordinates will be rounded to 2
-            # decimal places to add noise to the data. This is important since the laser data is not 100% accurate.
-            # Thus, no new obstacles will be added to the same position when scanning the same obstacle multiple times.
-            obstacle_x = round(obstacle_x, 2)
-            obstacle_y = round(obstacle_y, 2)
+            # Add the obstacle to the scanned obstacles list
             scanned_obstacles.append(Point(obstacle_x, obstacle_y))
 
         return scanned_obstacles
@@ -317,23 +360,18 @@ class FastSlam:
         Filter out the new obstacles which will be added to the obstacles list so the map will show new borders and obstacles.
         :param scanned_obstacles: The scanned obstacles
         """
+        # Round the coordinates of the scanned obstacles to 2 decimal places to add noise to the data.
+        # This is important since the laser data is not 100% accurate.
+        # Thus, no new obstacles will be added to the same position when scanning the same obstacle multiple times.
+        for scanned_obstacle in scanned_obstacles:
+            scanned_obstacle.x = round(scanned_obstacle.x, 2)
+            scanned_obstacle.y = round(scanned_obstacle.y, 2)
+
         # Update obstacles list with the scanned obstacles
         existing_coords = {(obstacle.x, obstacle.y) for obstacle in self.__obstacles}
         new_obstacles = [obstacle for obstacle in scanned_obstacles if
                          (obstacle.x, obstacle.y) not in existing_coords]
         self.__obstacles.extend(new_obstacles)
-
-    def __update_landmarks(self, scanned_obstacles: list[Point]):
-        """
-        Update the landmarks of the particles with the scanned obstacles.
-        :param scanned_obstacles: The scanned obstacles
-        """
-        # Extract landmarks from the scanned obstacles
-        captured_landmarks = self.__capture_landmarks(scanned_obstacles)
-
-        # Update the landmarks of the particles with the captured landmarks
-        for particle in self.__particles:
-            particle.update_landmarks(captured_landmarks)
 
     @staticmethod
     def __capture_landmarks(scanned_obstacles: list[Point]) -> list[Landmark]:
@@ -373,17 +411,45 @@ class FastSlam:
 
         return extracted_landmarks
 
-    def __update_particles(self):
+    def __update_particles(self, captured_landmarks: list[Landmark]):
         """
-        Update the weights of the particles and remove the particles under the weight threshold.
+        Update the weights of the particles based on the likelihood of the particle given the captured landmarks.
         """
         for particle in self.__particles:
-            # Update the weight of the particle
-            particle.weight = self.__calculate_particle_weight(particle)
+            weight = 1.0
 
-            # Remove particle if weight is below threshold
-            if particle.weight < self.__weight_threshold:
-                self.__particles.remove(particle)
+            for captured_landmark in captured_landmarks:
+                # Estimated landmark position based on the particle's position
+                dx = captured_landmark.x - particle.x
+                dy = captured_landmark.y - particle.y
+                predicted_range = np.sqrt(dx ** 2 + dy ** 2)
+                predicted_bearing = np.arctan2(dy, dx) - particle.get_yaw_rad()
+
+                # Actual measured landmark position
+                measurement = np.array([captured_landmark.x, captured_landmark.y])
+                mu = np.array([predicted_range, predicted_bearing])
+                covariance = captured_landmark.covariance_matrix
+
+                # Berechnung der Mahalanobis-Distanz
+                distance = mahalanobis_distance(mu, measurement, covariance)
+
+                # Calculate the mahalanobis distance between the captured landmark and the particle's landmark
+                # using the landmark covariance matrix of the particle's landmark
+                distance = LandmarkService.mahalanobis_distance(
+                    particle_landmark.position(),
+                    captured_landmark.position(),
+                    particle_landmark.covariance_matrix
+                )
+
+                # Berechnung der Gewichtung basierend auf der Mahalanobis-Distanz
+                # Du kannst eine Threshold oder eine Gewichtsfunktion verwenden
+                if distance < 1.0:  # Beispielschwellenwert
+                    likelihood = np.exp(-0.5 * distance ** 2)  # Gaußsche Verteilung
+                    weight *= likelihood
+
+            # Aktualisiere das Gewicht des Partikels
+            particle['weight'] = weight
+            updated_particles.append(particle)
 
     def __calculate_particle_weight(self, particle):
         pass
@@ -397,7 +463,12 @@ WEIGHT_THRESHOLD = 0.2
 MAXIMUM_POINT_DISTANCE = 0.1
 MIN_SAMPLES = 6
 
+# Translation and rotation noise represent the standard deviation of the translation and rotation.
+# The noise is used to add uncertainty to the movement of the robot and particles. It depends on the accuracy of the robot's odometry sensors.
+TRANSLATION_NOISE = 0.1
+ROTATION_NOISE = 0.1
+
 # The measurement noise of the Kalman filter depends on the laser's accuracy
 MEASUREMENT_NOISE = np.array([[0.1, 0.0], [0.0, 0.1]])
 
-fast_slam = FastSlam(NUM_PARTICLES, WEIGHT_THRESHOLD)
+fast_slam = FastSlam()
