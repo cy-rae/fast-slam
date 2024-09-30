@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
 from sklearn.cluster import DBSCAN
+import math
 
 
 class LaserData:
@@ -36,19 +37,20 @@ class Point:
         return np.array([self.x, self.y], dtype=float)
 
 
-class Landmark(Point):
+class Landmark:
     """
     Class to represent a landmark
     """
 
-    def __init__(self, x: float, y: float, covariance_matrix: ndarray = np.array([[1.0, 0.0], [0.0, 1.0]])):
+    def __init__(self, distance: float, yaw: float, covariance_matrix: ndarray = np.array([[1.0, 0.0], [0.0, 1.0]])):
         """
-        Initialize the landmark with the passed x and y values.
-        :param x: The x coordinate
-        :param y: The y coordinate
+        Initialize the landmark with the passed distance and yaw values which represent the mean of the landmark.
+        :param distance: The distance to the landmark
+        :param yaw: The angle to the landmark
         :param covariance_matrix: The covariance matrix of the landmark. Default value is a diagonal matrix with 1.0 (high uncertainty) on the diagonal
         """
-        super().__init__(x, y)
+        self.distance = distance
+        self.yaw = yaw
         # The covariance matrix of the landmark represents the uncertainty of the landmark's position.
         self.covariance_matrix: ndarray = covariance_matrix
 
@@ -178,9 +180,10 @@ class LandmarkService:
     """
 
     @staticmethod
-    def update_landmarks(existing_landmarks: list[Landmark], captured_landmarks: list[Landmark]) -> list[Landmark]:
+    def update_landmarks(position: ndarray, existing_landmarks: list[Landmark], captured_landmarks: list[Landmark]) -> list[Landmark]:
         """
         Update the passed existing landmarks with the passed newly captured landmarks.
+        :param position: The position of the particle / robot
         :param existing_landmarks: The landmarks to update
         :param captured_landmarks: The newly captured landmarks which will be used to update the existing landmarks
         :return: Returns a list the updated landmarks
@@ -301,12 +304,10 @@ class FastSlam:
 
         # Update the landmarks of the particles with the captured landmarks
         for particle in self.__particles:
-            updated_landmarks = LandmarkService.update_landmarks(particle.landmarks, captured_landmarks)
-            particle.landmarks = updated_landmarks
+            particle.landmarks = LandmarkService.update_landmarks(particle.position(), particle.landmarks, captured_landmarks)
 
         # Update the actual measured landmarks
-        updated_landmarks = LandmarkService.update_landmarks(self.__landmarks, captured_landmarks)
-        self.__landmarks = updated_landmarks
+        self.__landmarks = LandmarkService.update_landmarks(self.__landmarks, captured_landmarks)
 
         # Update the particles with regard to their weights. The weight depends on the likelihood of the particle given the captured landmarks.
         if len(captured_landmarks) > 0:
@@ -373,8 +374,7 @@ class FastSlam:
                          (obstacle.x, obstacle.y) not in existing_coords]
         self.__obstacles.extend(new_obstacles)
 
-    @staticmethod
-    def __capture_landmarks(scanned_obstacles: list[Point]) -> list[Landmark]:
+    def __capture_landmarks(self, scanned_obstacles: list[Point]) -> list[Landmark]:
         """
         Capture landmarks from the scanned obstacles using distance-based clustering.
         :param scanned_obstacles: The scanned obstacles
@@ -406,8 +406,14 @@ class FastSlam:
             x = np.mean(cluster_points[:, 0])
             y = np.mean(cluster_points[:, 1])
 
+            # Calculate the distance and angle of the landmark to the current robot position
+            dx = x - self.__robot.x
+            dy = y - self.__robot.y
+            distance = math.sqrt(dx ** 2 + dy ** 2)
+            angle = math.atan2(dy, dx) # Todo: Maybe take robot's yaw into account
+
             # Create a new landmark object and add it to the landmarks list
-            extracted_landmarks.append(Landmark(float(x), float(y)))
+            extracted_landmarks.append(Landmark(distance, angle))
 
         return extracted_landmarks
 
