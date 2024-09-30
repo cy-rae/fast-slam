@@ -6,7 +6,7 @@ ENV http_proxy=http://rb-proxy-de.bosch.com:8080
 ENV https_proxy=http://rb-proxy-de.bosch.com:8080
 
 # Install NGINX and other dependencies
-RUN apt-get update && apt-get install -y nginx
+RUN apt-get update && apt-get install -y nginx && pip install scikit-learn
 
 # Copy the custom Nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf

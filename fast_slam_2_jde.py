@@ -1,10 +1,12 @@
-﻿import math
+import math
 import random
 
 import numpy as np
-from matplotlib import pyplot as plt
+from PIL import Image, ImageDraw, ImageFont
 from numpy import ndarray
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, KMeans
+
+from src.models.laser_data import HAL
 
 
 class Point:
@@ -287,41 +289,32 @@ class FastSLAM2:
 
         return resampled_particles
 
+    def estimate_robot_position(self):
+        """
+        Calculate the estimated position of the robot based on the passed particles.
+        The estimation is based on the mean of the particles.
+        :return: Returns the estimated position of the robot as a tuple (x, y, yaw)
+        """
+        x_mean = 0.0
+        y_mean = 0.0
+        yaw_mean = 0.0
+        total_weight = sum(p.weight for p in self.particles)
 
-# PARAMETERS
-# Number of particles
-NUM_PARTICLES = 100
+        # Calculate the mean of the particles
+        for p in self.particles:
+            x_mean += p.x * p.weight
+            y_mean += p.y * p.weight
+            yaw_mean += p.yaw * p.weight
 
-# Distance-based clustering parameters
-MAXIMUM_POINT_DISTANCE = 0.1
-MIN_SAMPLES = 6
+        # Normalize the estimated position
+        x_mean /= total_weight
+        y_mean /= total_weight
+        yaw_mean /= total_weight
 
-# Translation and rotation noise represent the standard deviation of the translation and rotation.
-# The noise is used to add uncertainty to the movement of the robot and particles. It depends on the accuracy of the robot's odometry sensors.
-TRANSLATION_NOISE = 0.1
-ROTATION_NOISE = 0.1
-
-# The measurement noise of the Kalman filter depends on the laser's accuracy
-MEASUREMENT_NOISE = np.array([[0.1, 0.0], [0.0, 0.1]])
+        return x_mean, y_mean, yaw_mean
 
 
 # -- JDE ROBOTS SPECIFIC -----------------------------------------------------------------------------------------------------------------------------------------
-
-class LaserData:
-    """
-    Class to represent the laser data
-    """
-
-    def __init__(self, min_angle: float, max_angle: float, min_range: float, max_range: float, values: list[float]):
-        self.min_angle = min_angle
-        self.max_angle = max_angle
-        self.min_range = min_range
-        self.max_range = max_range
-        self.values = values
-
-
-def create_laser_data() -> LaserData:
-    return LaserData()
 
 
 class Robot(DirectedPoint):
@@ -332,33 +325,28 @@ class Robot(DirectedPoint):
     def __init__(self):
         super().__init__(0, 0, 0)
 
-    def scan_environment(self, laser_data: LaserData) -> list[Point]:
+    @staticmethod
+    def scan_environment() -> list[Point]:
         """
         Scan the environment using the laser data and return a list of points that were scanned by the laser.
-        :param laser_data: The laser data from the robot which contain the information about obstacles in the environment
         :return: Return a list of points that were scanned by the laser
         """
-        # Get the angle increment, so we can calculate the angle of each laser beam.
-        angle_increment = (laser_data.max_angle - laser_data.min_angle) / len(laser_data.values)
+        # Get laser data from the robot. Laser data contains the distances and angles to obstacles in the environment.
+        laser_data = HAL.getLaserData()
 
-        # Iterate over the laser data values and calculate the point coordinates of the scanned obstacles
+        # Convert each laser data value to a point
         scanned_points: list[Point] = []
-        for i, distance in enumerate(laser_data.values):
-            # If the distance is smaller than the minimum range or larger than the maximum range, no obstacle was found
-            if distance < laser_data.min_range or distance > laser_data.max_range:
-                continue
+        for i in range(180):  # Laser data has 180 values
+            # Extract the distance at index i
+            dist = laser_data.values[i]
 
-            # Calculate the angle of the laser beam in global coordinates. The angle is the sum of the robot's yaw and the laser angle.
-            laser_angle = laser_data.min_angle + i * angle_increment
-            global_angle = self.yaw + laser_angle
+            # The final angle is centered (zeroed) at the front of the robot.
+            angle = np.radians(i - 90)
 
-            # Calculate the point coordinates in global coordinates
-            obstacle_x = distance * np.cos(np.radians(global_angle))
-            obstacle_y = distance * np.sin(np.radians(global_angle))
-
-            # Add the obstacle to the scanned obstacles list
-            scanned_points.append(Point(obstacle_x, obstacle_y))
-
+            # Compute x, y coordinates from distance and angle
+            x = dist * math.cos(angle)
+            y = dist * math.sin(angle)
+            scanned_points.append(Point(x, y))
         return scanned_points
 
     def get_measurements_to_landmarks(self, scanned_points: list[Point]) -> list[Measurement]:
@@ -381,7 +369,7 @@ class Robot(DirectedPoint):
         unique_labels: set[int] = set(labels)
 
         # Iterate over the clusters and calculate the distance and angle of the landmark to the robot
-        observations: list[Measurement] = []
+        measurements: list[Measurement] = []
         for label in unique_labels:
             #  The label -1 represents noise (isolated points) and can be skipped
             if label == -1:
@@ -401,9 +389,9 @@ class Robot(DirectedPoint):
             angle = math.atan2(dy, dx) - self.get_yaw_rad()
 
             # Create a new landmark object and add it to the landmarks list
-            observations.append(Measurement(distance, angle))
+            measurements.append(Measurement(distance, angle))
 
-        return observations
+        return measurements
 
 
 def update_obstacles(scanned_obstacles: list[Point]):
@@ -411,91 +399,165 @@ def update_obstacles(scanned_obstacles: list[Point]):
     Filter out the new obstacles which will be added to the obstacles list so the map will show new borders and obstacles.
     :param scanned_obstacles: The scanned obstacles
     """
+    # Apply translation and rotation of the robot to the scanned obstacles to get the global coordinates
+    global_points: list[Point] = []
+    for scanned_obstacle in scanned_obstacles:
+        x_global = robot.x + (
+                    scanned_obstacle.x * np.cos(robot.get_yaw_rad()) - scanned_obstacle.y * np.sin(robot.get_yaw_rad()))
+        y_global = robot.y + (
+                    scanned_obstacle.x * np.sin(robot.get_yaw_rad()) + scanned_obstacle.y * np.cos(robot.get_yaw_rad()))
+        global_points.append(Point(x_global, y_global))
+
     # Round the coordinates of the scanned obstacles to 2 decimal places to add noise to the data.
     # This is important since the laser data is not 100% accurate.
     # Thus, no new obstacles will be added to the same position when scanning the same obstacle multiple times.
-    for scanned_obstacle in scanned_obstacles:
-        scanned_obstacle.x = round(scanned_obstacle.x, 2)
-        scanned_obstacle.y = round(scanned_obstacle.y, 2)
+    for global_point in global_points:
+        global_point.x = round(global_point.x, 2)
+        global_point.y = round(global_point.y, 2)
 
     # Update obstacles list with the scanned obstacles
     existing_coords = {(obstacle.x, obstacle.y) for obstacle in obstacles}
-    new_obstacles = [obstacle for obstacle in scanned_obstacles if
+    new_obstacles = [obstacle for obstacle in global_points if
                      (obstacle.x, obstacle.y) not in existing_coords]
     obstacles.extend(new_obstacles)
 
 
+def get_weighted_landmarks() -> list[Landmark]:
+    """
+    Get the weighted landmarks by clustering the landmarks based on the particle weights using weighted k-means.
+    :return: Returns a list with the weighted landmarks
+    """
+    # Get all landmarks and the corresponding particle weights
+    landmark_poses_weights = [(landmark.pose(), particle.weight) for particle in fast_slam.particles for landmark in
+                              particle.landmarks]
+    if len(landmark_poses_weights) == 0:
+        return []
+
+    (landmark_poses, weights) = zip(*landmark_poses_weights)
+
+    # Get the number of clusters based on average number of landmarks per particle
+    num_clusters = round(len(landmark_poses) / len(fast_slam.particles))
+
+    # Use weighted k-means to cluster the landmarks based on the particle weights.
+    # (The random state is set for reproducibility of random results which is useful for debugging)
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42).fit(landmark_poses, sample_weight=weights)
+
+    # Return the cluster centroids which represent the weighted landmarks
+    centroids = kmeans.cluster_centers_
+    return [Landmark(centroid[0], centroid[1]) for centroid in centroids]
+
+
 class Map:
     @staticmethod
-    def plot_map(landmarks: list[Point]):
+    def plot_map():
         """
         Plot the map with the robot, particles, landmarks and obstacles/borders.
-        :param landmarks: The list of landmark objects
         """
-        Map.__init_plot()
-        Map.__plot_as_arrows(directed_points=[robot], scale=5.5, color='r')  # Plot the robot as a red arrow
-        Map.__plot_as_arrows(directed_points=fast_slam.particles, scale=7,
-                             color='b')  # Plot the particles as blue arrows
-        Map.__plot_as_dots(obstacles, 'k')  # Mark obstacles as black dots
-        Map.__plot_as_dots(landmarks, 'g')  # Mark landmarks as green dots
+        try:
+            image, draw = Map.__init_plot()
+            Map.__plot_as_arrows(draw, directed_points=[robot], scale=5.5, color='red')  # Plot the robot as a red arrow
+            Map.__plot_as_arrows(draw, directed_points=fast_slam.particles, scale=7,
+                                 color='blue')  # Plot the particles as blue arrows
+            Map.__plot_as_dots(draw, obstacles, 'black')  # Mark obstacles as black dots
+            Map.__plot_as_dots(draw, landmarks, 'green')  # Mark landmarks as green dots
 
-        # Save the plot as an image file and plot it
-        plt.savefig('/usr/share/nginx/html/images/map.jpg')
-        plt.show()
+            # Save the plot as an image file
+            image.save('/usr/share/nginx/html/images/map.jpg', 'JPEG')
+        except Exception as e:
+            print(e)
 
     @staticmethod
     def __init_plot():
         """
         Initialize the plot
         """
-        plt.figure()
-        plt.xlim(-6, 6)
-        plt.ylim(-6, 6)
-        plt.xlabel('X-axis')
-        plt.ylabel('Y-axis')
-        plt.title('Map created by the FastSLAM 2.0 algorithm')
+        # Bildgröße und Hintergrundfarbe
+        width, height = 600, 600
+        image = Image.new("RGB", (width, height), "white")
+        draw = ImageDraw.Draw(image)
+
+        # Achsen zeichnen
+        center_x = width // 2
+        center_y = height // 2
+        draw.line((0, center_y, width, center_y), fill="black", width=2)  # X-Achse
+        draw.line((center_x, 0, center_x, height), fill="black", width=2)  # Y-Achse
+
+        # Achsenbeschriftungen
+        font = ImageFont.load_default()
+        draw.text((width - 100, center_y + 10), "X-axis", fill="black", font=font)
+        draw.text((center_x + 10, 10), "Y-axis", fill="black", font=font)
+        draw.text((width // 4, 10), "Map created by the FastSLAM 2.0 algorithm", fill="black", font=font)
+
+        return image, draw
 
     @staticmethod
-    def __plot_as_arrows(directed_points: list[DirectedPoint], scale: float, color: str):
+    def __plot_as_arrows(draw: ImageDraw.Draw, directed_points: list[DirectedPoint], scale: float, color: str):
         """
         Plot the passed directed points as arrows with the passed scale and color.
-        :param directed_points: This list contains all the directed points which will be represented as (short) arrows
+        :param directed_points: This list contains all the directed points which will be represented as arrows
         :param scale: The scale of the arrow
         :param color: The color of the arrow
         """
-        plt.quiver(
-            [obj.x for obj in directed_points],
-            [particle.y for particle in directed_points],
-            [np.cos(obj.get_yaw_rad()) for obj in directed_points],
-            [np.sin(obj.get_yaw_rad()) for obj in directed_points],
-            scale=scale,
-            scale_units='inches',
-            angles='xy',
-            color=color
-        )
+        center_x = 300  # Mittelpunkt der X-Achse
+        center_y = 300  # Mittelpunkt der Y-Achse
+        for obj in directed_points:
+            # Berechnung der Endpunkte des Pfeils
+            x_start = center_x + obj.x * 50  # Skaliere die X-Koordinate
+            y_start = center_y - obj.y * 50  # Skaliere die Y-Koordinate
+            x_end = x_start + np.cos(obj.get_yaw_rad()) * scale
+            y_end = y_start - np.sin(obj.get_yaw_rad()) * scale
+            # Zeichne den Pfeil
+            draw.line((x_start, y_start, x_end, y_end), fill=color, width=3)
+            # Zeichne die Pfeilspitze
+            arrow_size = 5
+            draw.line((x_end, y_end, x_end - arrow_size * np.cos(obj.get_yaw_rad() + np.pi / 6),
+                       y_end + arrow_size * np.sin(obj.get_yaw_rad() + np.pi / 6)), fill=color, width=3)
+            draw.line((x_end, y_end, x_end - arrow_size * np.cos(obj.get_yaw_rad() - np.pi / 6),
+                       y_end + arrow_size * np.sin(obj.get_yaw_rad() - np.pi / 6)), fill=color, width=3)
 
     @staticmethod
-    def __plot_as_dots(points: list[Point], color: str):
+    def __plot_as_dots(draw: ImageDraw.Draw, points: list[Point], color: str):
         """
         Plot the passed points as dots. The color of the dots is determined by the passed color parameter.
         :param points: This list contains all the points which will be represented as dots in the map
         :param color: The color of the dot ('k' -> black, 'g' -> green)
         """
-        for landmark in points:
-            plt.plot(landmark.x, landmark.y, color + 'o')  # 'o' -> circle marker
+        for point in points:
+            x = 300 + point.x * 50  # Skaliere die X-Koordinate
+            y = 300 - point.y * 50  # Skaliere die Y-Koordinate
+            radius = 3
+            draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=color)
 
+
+# PARAMETERS
+# Number of particles
+NUM_PARTICLES = 60
+
+# Distance-based clustering parameters
+MAXIMUM_POINT_DISTANCE = 0.1
+MIN_SAMPLES = 6
+
+# Translation and rotation noise represent the standard deviation of the translation and rotation.
+# The noise is used to add uncertainty to the movement of the robot and particles. It depends on the accuracy of the robot's odometry sensors.
+TRANSLATION_NOISE = 0.1
+ROTATION_NOISE = 0.1
+
+# The measurement noise of the Kalman filter depends on the laser's accuracy
+MEASUREMENT_NOISE = np.array([[0.1, 0.0], [0.0, 0.1]])
 
 fast_slam = FastSLAM2()
 robot = Robot()
 obstacles: list[Point] = []  # List of obstacles in the environment which will be plotted in the map
+landmarks: list[Landmark] = []
 
-laser_beams = create_laser_data()
-
+# The minimum number of iterations before updating the robot's position based on the estimated position of the particles
+MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 15
+iteration = 0
 while True:
-    v, w = 1, 1
+    v_i, w_i = 0, 0
 
     # Get the points of scanned obstacles in the environment using the robot's laser data
-    point_list = robot.scan_environment(laser_beams)
+    point_list = robot.scan_environment()
 
     # Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
     update_obstacles(point_list)
@@ -504,7 +566,22 @@ while True:
     measurement_list = robot.get_measurements_to_landmarks(point_list)
 
     # Iterate the FastSLAM 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
-    fast_slam.iterate(v, w, measurement_list)
+    fast_slam.iterate(v_i, w_i, measurement_list)
 
-    # Todo: Get landmarks
-    Map.plot_map([landmark for particle in fast_slam.particles for landmark in particle.landmarks])
+    # Update the robot's position based on the estimated position of the particles after a configured number of iterations
+    if iteration >= MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION:
+        (robot.x, robot.y, robot.yaw) = fast_slam.estimate_robot_position()
+    else:
+        # Update the robot's position based on the current linear and angular velocities
+        robot.x += v_i * np.cos(robot.get_yaw_rad())
+        robot.y += v_i * np.sin(robot.get_yaw_rad())
+        robot.yaw = (robot.yaw + w_i) % 360
+
+    # Get the weighted landmarks by clustering the landmarks based on the particle weights
+    landmarks = get_weighted_landmarks()
+
+    # Plot the map with the robot, particles, landmarks and obstacles/borders
+    Map.plot_map()
+
+    # Increase iteration
+    iteration += 1
