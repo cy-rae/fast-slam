@@ -793,29 +793,28 @@ landmarks: list[Landmark] = []
 # endregion
 
 # The minimum number of iterations before updating the robot's position based on the estimated position of the particles
-MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 1000
+MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 100
 iteration = 0
 while True:
     # Set linear velocity
-    v_i = 0.1
+    v_i = 0.6
 
     # Set angular velocity. If the robot hits the wall, the angular velocity will be set to 0
     bumper = HAL.getBumperData().state
     if bumper == 1:
-        w_i = 0.1
+        w_i = 0.6
     else:
         w_i = 0
 
-    w_i, v_i = 0, 0
     # Move robot
-    # HAL.setV(v_i)
-    # HAL.setW(w_i)
+    HAL.setV(v_i)
+    HAL.setW(w_i)
 
     # Get the points of scanned obstacles in the environment using the robot's laser data
     point_list = robot.scan_environment()
 
     # Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
-    obstacles = point_list
+    # obstacles = point_list
 
     # Get the landmarks from the scanned points using line filter and IEPF
     measurement_list = LandmarkService.get_measurements_to_landmarks(point_list)
