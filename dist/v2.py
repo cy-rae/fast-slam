@@ -8,11 +8,11 @@ import math
 import random
 
 import HAL
+import GUI
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from numpy import ndarray
 from scipy import ndimage
-from scipy.cluster.hierarchy import average
 from sklearn.cluster import DBSCAN
 
 
@@ -131,8 +131,8 @@ class Robot(DirectedPoint):
     This class represents the robot
     """
 
-    def __init__(self):
-        super().__init__(0, 0, 0)
+    def __init__(self, x=0.0, y=0.0, yaw=0.0):
+        super().__init__(x, y, yaw)
 
     @staticmethod
     def scan_environment() -> list[Point]:
@@ -541,7 +541,7 @@ class ValidationService:
             estimated_x = 0.1
 
         # Calculate the deviation percentage for the x-coordinate
-        x_deviation_percentage = (abs(delta_x) / abs(estimated_x)) * 10 # Times 10 so 100% equals offset of 1 'meter'
+        x_deviation_percentage = (abs(delta_x) / abs(estimated_x)) * 10  # Times 10 so 100% equals offset of 1 'meter'
 
         return x_deviation_percentage
 
@@ -556,7 +556,7 @@ class ValidationService:
             estimated_y = 0.1
 
         # Calculate the deviation percentage for the x-coordinate
-        y_deviation_percentage = (abs(delta_y) / abs(estimated_y)) * 10 # Times 10 so 100% equals offset of 1 'meter'
+        y_deviation_percentage = (abs(delta_y) / abs(estimated_y)) * 10  # Times 10 so 100% equals offset of 1 'meter'
 
         return y_deviation_percentage
 
@@ -573,7 +573,8 @@ class ValidationService:
         # Angular deviation percentage (relative to a full rotation of 360 degrees)
         return (angular_deviation / 360) * 100
 
-#endregion
+
+# endregion
 
 # region FastSLAM 2.0
 class FastSLAM2:
@@ -797,12 +798,16 @@ MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 100
 iteration = 0
 while True:
     # Set linear velocity
-    v_i = 0.6
+    v_i = 1
 
     # Set angular velocity. If the robot hits the wall, the angular velocity will be set to 0
-    bumper = HAL.getBumperData().state
-    if bumper == 1:
-        w_i = 0.6
+    bumper_state = HAL.getBumperData().state
+    if bumper_state == 1:
+        bumper = HAL.getBumperData().bumper
+        if bumper == 0: # right bumper
+            w_i = 1
+        else:   # left or center bumper
+            w_i = -1
     else:
         w_i = 0
 
