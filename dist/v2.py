@@ -6,6 +6,7 @@ The robot will move in the environment and update its position based on the obse
 """
 import math
 import random
+from math import radians
 
 import HAL
 import numpy as np
@@ -13,7 +14,6 @@ from PIL import Image, ImageDraw, ImageFont
 from numpy import ndarray
 from scipy import ndimage
 from sklearn.cluster import DBSCAN, KMeans
-from sklearn.linear_model import RANSACRegressor
 
 
 # region Models
@@ -162,137 +162,164 @@ class Robot(DirectedPoint):
             scanned_points.append(Point(x, y))
         return scanned_points
 
-    def get_measurements_to_landmarks(self, scanned_points: list[Point]) -> list[Measurement]:
-        """
-        Search for landmarks in passed list of points using distance-based clustering
-        and measure their distances and angles to the robot. One cluster of points represents a landmark.
-        :param scanned_points: The scanned obstacles as points.
-        :return: The distances and angles from the observed landmarks to the robot will be returned.
-        """
-        # Get scanned obstacles/points as vectors
-        x_coords = [obstacle.x for obstacle in scanned_points]
-        y_coords = [obstacle.y for obstacle in scanned_points]
-        points = np.column_stack((x_coords, y_coords))
-
-        # Use distance-based clustering to extract clusters which represent landmarks
-        db = DBSCAN(eps=MAXIMUM_POINT_DISTANCE, min_samples=MIN_SAMPLES).fit(points)
-
-        # Get the unique labels (-1, 0, 1, 2, ...)  which represent the clusters.
-        labels: ndarray = db.labels_
-        unique_labels: set[int] = set(labels)
-
-        # Iterate over the clusters and calculate the distance and angle of the landmark to the robot
-        measurements: list[Measurement] = []
-        for label in unique_labels:
-            #  The label -1 represents noise (isolated points) and can be skipped
-            if label == -1:
-                continue
-
-            # Get the points which belong to the current cluster
-            cluster_points = points[labels == label]
-
-            # Calculate the centroid of the cluster
-            x = np.mean(cluster_points[:, 0])
-            y = np.mean(cluster_points[:, 1])
-
-            # Calculate the distance and angle of the landmark to the current robot position
-            dx = x - self.x
-            dy = y - self.y
-            distance = math.sqrt(dx ** 2 + dy ** 2)
-            angle = math.atan2(dy, dx) - self.get_yaw_rad()
-
-            # Create a new landmark object and add it to the landmarks list
-            measurements.append(Measurement(distance, angle))
-
-        return measurements
-
 
 # endregion
 
 # region Services
-class MapService:
-    """
-    Service class to plot the map with the robot, particles, landmarks and obstacles/borders.
-    """
+class LandmarkService:
+    @staticmethod
+    def get_measurements_to_landmarks(scanned_points: list[Point]) -> list[Measurement]:
+        """
+        Extract landmarks from the scanned points using the IEPF algorithm.
+        :param scanned_points: The scanned points
+        :return: Returns a list with the extracted landmarks
+        """
+        # Get poses of scanned points
+        point_data = np.array([point.pose() for point in scanned_points])
+
+        # Apply line filter to the scanned points to reduce noise
+        filtered_points = LandmarkService.line_filter(point_data)
+
+        # Extract line segments using the IEPF algorithm
+        line_segments: list[tuple[ndarray, ndarray]] = LandmarkService.iepf(filtered_points)
+
+        # Calculate intersections from the line segments
+        intersections: list[ndarray] = LandmarkService.calculate_intersections(line_segments)
+
+        # Each intersection is a landmark
+        measurements = []
+        for intersection in intersections:
+            dist, angle = LandmarkService.calculate_distance_and_angle(float(intersection[0]), float(intersection[1]))
+            measurements.append(Measurement(dist, angle))
+
+        return measurements
 
     @staticmethod
-    def plot_map():
+    def line_filter(points, sigma=0.05):
         """
-        Plot the map with the robot, particles, landmarks and obstacles/borders.
+        Apply a Gaussian filter to the points to reduce noise.
+        :param points: The points to filter
+        :param sigma: The standard deviation of the Gaussian filter
+        :return: Returns the filtered points
         """
-        try:
-            image, draw = MapService.__init_plot()
-            MapService.__plot_as_arrows(draw, directed_points=[robot], scale=5.5, color='red')  # Plot the robot as a red arrow
-            MapService.__plot_as_arrows(draw, directed_points=fast_slam.particles, scale=7, color='blue')  # Plot the particles as blue arrows
-            MapService.__plot_as_dots(draw, obstacles, 'black')  # Mark obstacles as black dots
-            MapService.__plot_as_dots(draw, landmarks, 'green')  # Mark landmarks as green dots
-
-            # Save the plot as an image file
-            image.save('/usr/share/nginx/html/images/map.jpg', 'JPEG')
-        except Exception as e:
-            print(e)
+        x_filtered = ndimage.gaussian_filter1d(points[:, 0], sigma=sigma)
+        y_filtered = ndimage.gaussian_filter1d(points[:, 1], sigma=sigma)
+        return np.vstack((x_filtered, y_filtered)).T
 
     @staticmethod
-    def __init_plot():
+    def iepf(points, tolerance=0.2) -> list[tuple[ndarray, ndarray]]:
         """
-        Initialize the plot
+        Extract line segments from the points using the Iterative End Point Fit algorithm.
+        :param points: The points to extract line segments from
+        :param tolerance: The tolerance for the recursive IEPF algorithm. (Default value is set to 0.2)
+        This tolerance determines the maximum distance that a point may be from a line in order to be considered part of the line.
+        :return: Returns the extracted line segments
         """
-        # Image size and background color
-        width, height = 1000, 1000
-        image = Image.new("RGB", (width, height), "white")
-        draw = ImageDraw.Draw(image)
 
-        # Draw the axes
-        center_x = width // 2
-        center_y = height // 2
-        draw.line((0, center_y, width, center_y), fill="black", width=2)  # X-Achse
-        draw.line((center_x, 0, center_x, height), fill="black", width=2)  # Y-Achse
+        def fit_line(p1, p2, point):
+            """
+            Calculate the distance of a point to a line defined by two points.
+            :param p1: The first point of the line
+            :param p2: The second point of the line
+            :param point: The point for which the distance to the line should be calculated
+            :return: Returns the distance of the point to the line
+            """
+            return np.abs(
+                (p2[1] - p1[1]) * point[0] - (p2[0] - p1[0]) * point[1] + p2[0] * p1[1] - p2[1] * p1[
+                    0]) / np.linalg.norm(
+                p2 - p1)
 
-        # Axis labels
-        font = ImageFont.load_default()
-        draw.text((width - 100, center_y + 10), "X-axis", fill="black", font=font)
-        draw.text((center_x + 10, 10), "Y-axis", fill="black", font=font)
-        draw.text((width // 4, 10), "Map created by the FastSLAM 2.0 algorithm", fill="black", font=font)
+        def recursive_iepf(start, end):
+            """
+            Recursive IEPF algorithm to extract line segments from the points.
+            :param start: The start index of the points
+            :param end: The end index of the points
+            :return: Returns the extracted line segments
+            """
+            max_distance = 0
+            index = start
 
-        return image, draw
+            for i in range(start + 1, end):
+                # Calculate the distance of the point to the line defined by the start and end point
+                distance = fit_line(points[start], points[end], points[i])
+
+                # If the calculated distance is the new maximum distance, the index of the point will be saved to split the line segment eventually
+                if distance > max_distance:
+                    max_distance = distance
+                    index = i
+
+            # If the maximum distance is greater than the tolerance, split the line segment into two parts. Else, return the line segment.
+            if max_distance > tolerance:
+                return recursive_iepf(start, index) + recursive_iepf(index, end)
+            else:
+                return [(points[start], points[end])]
+
+        return recursive_iepf(0, len(points) - 1)
 
     @staticmethod
-    def __plot_as_arrows(draw: ImageDraw.Draw, directed_points: list[DirectedPoint], scale: float, color: str):
+    def calculate_intersections(line_segments: list[tuple[ndarray, ndarray]]) -> list[ndarray]:
         """
-        Plot the passed directed points as arrows with the passed scale and color.
-        :param directed_points: This list contains all the directed points which will be represented as arrows
-        :param scale: The scale of the arrow
-        :param color: The color of the arrow
+        Calculate the intersections of the line segments.
+        :param line_segments: The line segments for which the intersections should be calculated
+        :return: Returns a list with the intersections
         """
-        center_x = 500  # Middle of the X-axis
-        center_y = 500  # Middle of the Y-axis
-        for obj in directed_points:
-            # Calculate the start and end point of the arrow
-            x_start = center_x + obj.x * 50  # Skaliere die X-Koordinate
-            y_start = center_y - obj.y * 50  # Skaliere die Y-Koordinate
-            x_end = x_start + np.cos(obj.get_yaw_rad()) * scale
-            y_end = y_start - np.sin(obj.get_yaw_rad()) * scale
-            # Draw the arrow
-            draw.line((x_start, y_start, x_end, y_end), fill=color, width=3)
-            # Draw the arrow head
-            arrow_size = 5
-            draw.line((x_end, y_end, x_end - arrow_size * np.cos(obj.get_yaw_rad() + np.pi / 6),
-                       y_end + arrow_size * np.sin(obj.get_yaw_rad() + np.pi / 6)), fill=color, width=3)
-            draw.line((x_end, y_end, x_end - arrow_size * np.cos(obj.get_yaw_rad() - np.pi / 6),
-                       y_end + arrow_size * np.sin(obj.get_yaw_rad() - np.pi / 6)), fill=color, width=3)
+        intersections = []
+
+        # Compare each intersection
+        for i in range(len(line_segments)):
+            for j in range(i + 1, len(line_segments)):
+                intersection = LandmarkService.calculate_intersection(line_segments[i], line_segments[j])
+                if intersection is not None:
+                    intersections.append(intersection)
+
+        return intersections
 
     @staticmethod
-    def __plot_as_dots(draw: ImageDraw.Draw, points: list[Point], color: str):
+    def calculate_intersection(seg1: tuple[ndarray, ndarray], seg2: tuple[ndarray, ndarray]) -> ndarray or None:
         """
-        Plot the passed points as dots. The color of the dots is determined by the passed color parameter.
-        :param points: This list contains all the points which will be represented as dots in the map
-        :param color: The color of the dot ('k' -> black, 'g' -> green)
+        Calculate the intersection point of two line segments.
+        :param seg1: Contains the start and end point of the first line segment
+        :param seg2: Contains the start and end point of the second line segment
+        :return: Returns the intersection point of the two line segments or None if the lines do not intersect
         """
-        for point in points:
-            x = 500 + point.x * 50  # Scale the X-coordinate
-            y = 500 - point.y * 50  # Scale the Y-coordinate
-            radius = 3
-            draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=color)
+        # Get the start and end points of the segments
+        p1, p2 = seg1
+        p3, p4 = seg2
+
+        # Calculate the direction vectors of the segments
+        d1 = p2 - p1  # Direction from P1 to P2
+        d2 = p4 - p3  # Direction from P3 to P4
+
+        # Calculate the denominator which represents a measurement of the direction of the lines
+        denominator = d1[0] * d2[1] - d1[1] * d2[0]
+
+        # If the denominator is 0, the lines are parallel and will never intersect
+        if denominator == 0:
+            return None
+
+        # Calculate parameter t and u. These parameters represent the position of the intersection point on the lines
+        t = ((p3[0] - p1[0]) * d2[1] - (p3[1] - p1[1]) * d2[0]) / denominator
+        u = ((p3[0] - p1[0]) * d1[1] - (p3[1] - p1[1]) * d1[0]) / denominator
+
+        # Check if the intersection point lies within the segment boundaries
+        if 0 <= t <= 1 and 0 <= u <= 1:
+            intersection_x = p1[0] + t * d1[0]
+            intersection_y = p1[1] + t * d1[1]
+            return np.array([intersection_x, intersection_y])
+
+        return None  # Return None if the lines do not intersect
+
+    @staticmethod
+    def calculate_distance_and_angle(x: float, y: float):
+        """
+        Calculate the distance and angle of a point to the origin (0, 0). The angle is rotated by -90 degrees.
+        :param x: The x coordinate of the point
+        :param y: The y coordinate of the point
+        :return: Returns the distance(s) and angle(s) of the point(s) to the origin (0, 0)
+        """
+        distance = math.sqrt(x ** 2 + y ** 2)
+        angle = math.atan2(y, x)
+        return distance, angle
 
 
 class InterpretationService:
@@ -380,6 +407,93 @@ class InterpretationService:
         yaw_mean /= total_weight
 
         return x_mean, y_mean, yaw_mean
+
+
+class MapService:
+    """
+    Service class to plot the map with the robot, particles, landmarks and obstacles/borders.
+    """
+
+    @staticmethod
+    def plot_map():
+        """
+        Plot the map with the robot, particles, landmarks and obstacles/borders.
+        """
+        try:
+            image, draw = MapService.__init_plot()
+            MapService.__plot_as_arrows(draw, directed_points=[robot], scale=5.5,
+                                        color='red')  # Plot the robot as a red arrow
+            MapService.__plot_as_arrows(draw, directed_points=fast_slam.particles, scale=7,
+                                        color='blue')  # Plot the particles as blue arrows
+            MapService.__plot_as_dots(draw, obstacles, 'black')  # Mark obstacles as black dots
+            MapService.__plot_as_dots(draw, landmarks, 'green')  # Mark landmarks as green dots
+
+            # Save the plot as an image file
+            image.save('/usr/share/nginx/html/images/map.jpg', 'JPEG')
+        except Exception as e:
+            print(e)
+
+    @staticmethod
+    def __init_plot():
+        """
+        Initialize the plot
+        """
+        # Image size and background color
+        width, height = 1000, 1000
+        image = Image.new("RGB", (width, height), "white")
+        draw = ImageDraw.Draw(image)
+
+        # Draw the axes
+        center_x = width // 2
+        center_y = height // 2
+        draw.line((0, center_y, width, center_y), fill="black", width=2)  # X-Achse
+        draw.line((center_x, 0, center_x, height), fill="black", width=2)  # Y-Achse
+
+        # Axis labels
+        font = ImageFont.load_default()
+        draw.text((width - 100, center_y + 10), "X-axis", fill="black", font=font)
+        draw.text((center_x + 10, 10), "Y-axis", fill="black", font=font)
+        draw.text((width // 4, 10), "Map created by the FastSLAM 2.0 algorithm", fill="black", font=font)
+
+        return image, draw
+
+    @staticmethod
+    def __plot_as_arrows(draw: ImageDraw.Draw, directed_points: list[DirectedPoint], scale: float, color: str):
+        """
+        Plot the passed directed points as arrows with the passed scale and color.
+        :param directed_points: This list contains all the directed points which will be represented as arrows
+        :param scale: The scale of the arrow
+        :param color: The color of the arrow
+        """
+        center_x = 500  # Middle of the X-axis
+        center_y = 500  # Middle of the Y-axis
+        for obj in directed_points:
+            # Calculate the start and end point of the arrow
+            x_start = center_x + obj.x * 50  # Skaliere die X-Koordinate
+            y_start = center_y - obj.y * 50  # Skaliere die Y-Koordinate
+            x_end = x_start + np.cos(obj.get_yaw_rad()) * scale
+            y_end = y_start - np.sin(obj.get_yaw_rad()) * scale
+            # Draw the arrow
+            draw.line((x_start, y_start, x_end, y_end), fill=color, width=3)
+            # Draw the arrow head
+            arrow_size = 5
+            draw.line((x_end, y_end, x_end - arrow_size * np.cos(obj.get_yaw_rad() + np.pi / 6),
+                       y_end + arrow_size * np.sin(obj.get_yaw_rad() + np.pi / 6)), fill=color, width=3)
+            draw.line((x_end, y_end, x_end - arrow_size * np.cos(obj.get_yaw_rad() - np.pi / 6),
+                       y_end + arrow_size * np.sin(obj.get_yaw_rad() - np.pi / 6)), fill=color, width=3)
+
+    @staticmethod
+    def __plot_as_dots(draw: ImageDraw.Draw, points: list[Point], color: str):
+        """
+        Plot the passed points as dots. The color of the dots is determined by the passed color parameter.
+        :param points: This list contains all the points which will be represented as dots in the map
+        :param color: The color of the dot ('k' -> black, 'g' -> green)
+        """
+        for point in points:
+            x = 500 + point.x * 50  # Scale the X-coordinate
+            y = 500 - point.y * 50  # Scale the Y-coordinate
+            radius = 3
+            draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=color)
 
 
 # endregion
@@ -569,166 +683,6 @@ class FastSLAM2:
 
 # endregion
 
-def get_landmarks(scanned_points: list[Point]) -> list[Landmark]:
-    """
-    Extract landmarks from the scanned points using the IEPF algorithm.
-    :param scanned_points: The scanned points
-    :return: Returns a list with the extracted landmarks
-    """
-    # Get poses of scanned points
-    point_data = np.array([point.pose() for point in scanned_points])
-
-    # Apply line filter to the scanned points to reduce noise
-    filtered_points = line_filter(point_data)
-
-    # Extract line segments using the IEPF algorithm
-    line_segments = iepf(filtered_points)
-
-    # Calculate intersections from the line segments
-    intersections = calculate_intersections(line_segments)
-
-    # Each intersection is a landmark
-    new_landmarks = []
-    for intersection in intersections:
-        new_landmarks.append(Landmark(intersection[0], intersection[1]))
-
-    return new_landmarks
-
-def line_filter(points, sigma=1.0):
-    """
-    Apply a Gaussian filter to the points to reduce noise.
-    :param points: The points to filter
-    :param sigma: The standard deviation of the Gaussian filter
-    :return: Returns the filtered points
-    """
-    x_filtered = ndimage.gaussian_filter1d(points[:, 0], sigma=sigma)
-    y_filtered = ndimage.gaussian_filter1d(points[:, 1], sigma=sigma)
-    return np.vstack((x_filtered, y_filtered)).T
-
-def iepf(points, tolerance=0.2):
-    """
-    Extract line segments from the points using the Iterative End Point Fit algorithm.
-    :param points: The points to extract line segments from
-    :param tolerance: The tolerance for the recursive IEPF algorithm. (Default value is set to 0.2)
-    This tolerance determines the maximum distance that a point may be from a line in order to be considered part of the line.
-    :return: Returns the extracted line segments
-    """
-    def fit_line(p1, p2, point):
-        """
-
-        :param p1:
-        :param p2:
-        :param point:
-        :return:
-        """
-        return np.abs((p2[1] - p1[1]) * point[0] - (p2[0] - p1[0]) * point[1] + p2[0] * p1[1] - p2[1] * p1[0]) / np.linalg.norm(p2 - p1)
-
-    def recursive_iepf(start, end):
-        max_distance = 0
-        index = start
-
-        for i in range(start + 1, end):
-            distance = fit_line(points[start], points[end], points[i])
-            if distance > max_distance:
-                max_distance = distance
-                index = i
-
-        if max_distance > tolerance:
-            return recursive_iepf(start, index) + recursive_iepf(index, end)
-        else:
-            return [(points[start], points[end])]
-
-    return recursive_iepf(0, len(points) - 1)
-
-def calculate_intersections(line_segments):
-    corners = []
-    intersection_points = []
-
-    for i in range(len(line_segments)):
-        for j in range(i + 1, len(line_segments)):
-            seg1 = line_segments[i]
-            seg2 = line_segments[j]
-
-            if do_segments_intersect(seg1, seg2):
-                # Berechne den Schnittpunkt und füge ihn zur Liste der Schnittpunkte hinzu
-                intersection = calculate_intersection(seg1, seg2)
-                intersection_points.append(intersection)
-
-    # Kombiniere Ecken und Schnittpunkte
-    corners.extend(intersection_points)
-
-    return np.unique(corners, axis=0)  # Duplikate entfernen
-
-def do_segments_intersect(seg1, seg2):
-    p1, p2 = seg1
-    p3, p4 = seg2
-
-    def orientation(p, q, r):
-        # Berechne die Orientierung für drei Punkte
-        val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
-        if val == 0:
-            return 0  # collinear
-        return 1 if val > 0 else 2  # clockwise or counterclockwise
-
-    def on_segment(p, q, r):
-        # Prüfen, ob Punkt q auf dem Segment pr liegt
-        return (min(p[0], r[0]) <= q[0] <= max(p[0], r[0]) and
-                min(p[1], r[1]) <= q[1] <= max(p[1], r[1]))
-
-    # Berechne die 4 Orientierungen
-    o1 = orientation(p1, p2, p3)
-    o2 = orientation(p1, p2, p4)
-    o3 = orientation(p3, p4, p1)
-    o4 = orientation(p3, p4, p2)
-
-    # Allgemeiner Fall
-    if o1 != o2 and o3 != o4:
-        return True
-
-    # Sonderfälle
-    if o1 == 0 and on_segment(p1, p3, p2):
-        return True
-    if o2 == 0 and on_segment(p1, p4, p2):
-        return True
-    if o3 == 0 and on_segment(p3, p1, p4):
-        return True
-    if o4 == 0 and on_segment(p3, p2, p4):
-        return True
-
-    return False
-
-
-def calculate_intersection(seg1, seg2):
-    # Get the start and end points of the segments
-    p1, p2 = seg1
-    p3, p4 = seg2
-
-    # Calculate denominator of the intersection point which represents a measure of the direction of the two lines
-    denominator = (p1[0] - p2[0]) * (p3[1] - p4[1]) - (p1[1] - p2[1]) * (p3[0] - p4[0])
-
-    # If the denominator is 0, the lines are parallel and do not intersect
-    if denominator == 0:
-        return None
-
-    # Calculate the intersection point
-    intersect_x = ((p1[0] * p2[1] - p1[1] * p2[0]) * (p3[0] - p4[0]) - (p1[0] - p2[0]) * (
-                p3[0] * p4[1] - p3[1] * p4[0])) / denominator
-    intersect_y = ((p1[0] * p2[1] - p1[1] * p2[0]) * (p3[1] - p4[1]) - (p1[1] - p2[1]) * (
-                p3[0] * p4[1] - p3[1] * p4[0])) / denominator
-
-    return np.array([intersect_x, intersect_y])
-
-def calculate_distance_and_angle(point):
-    """
-    Calculate the distance and angle of a point to the origin (0, 0).
-    :param point: Point(s) for which the distance and angle should be calculated
-    :return: Returns the distance(s) and angle(s) of the point(s) to the origin (0, 0)
-    """
-    distance = np.sqrt(point[0] ** 2 + point[1] ** 2)
-    angle = np.arctan2(point[1], point[0])
-    return distance, angle
-
-
 # region PARAMETERS
 # Number of particles
 NUM_PARTICLES = 60
@@ -766,47 +720,43 @@ landmarks: list[Landmark] = []
 MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 1000
 iteration = 0
 while True:
-    # # Set linear velocity
-    # v_i = 0.1
-    #
-    # # Set angular velocity. If the robot hits the wall, the angular velocity will be set to 0
-    # bumper = HAL.getBumperData().state
-    # if bumper == 1:
-    #     w_i = 0.1
-    # else:
-    #     w_i = 0
-    #
-    # # Move robot
+    # Set linear velocity
+    v_i = 0.1
+
+    # Set angular velocity. If the robot hits the wall, the angular velocity will be set to 0
+    bumper = HAL.getBumperData().state
+    if bumper == 1:
+        w_i = 0.1
+    else:
+        w_i = 0
+
+    # Move robot
     # HAL.setV(v_i)
     # HAL.setW(w_i)
-
 
     # Get the points of scanned obstacles in the environment using the robot's laser data
     point_list = robot.scan_environment()
 
     # Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
-    obstacles = InterpretationService.update_obstacles(point_list)
+    obstacles = point_list
 
     # Get the landmarks from the scanned points using line filter and IEPF
-    landmarks = get_landmarks(point_list)
+    measurement_list = LandmarkService.get_measurements_to_landmarks(point_list)
 
-    # # Get the observations of the scanned landmarks
-    # measurement_list = get_measurements_to_landmarks(point_list)
-    #
-    # # Iterate the FastSLAM 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
-    # fast_slam.iterate(v_i, w_i, measurement_list)
-    #
-    # # Update the robot's position based on the estimated position of the particles after a configured number of iterations
-    # if iteration >= MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION and len(landmarks) > 3:
-    #     (robot.x, robot.y, robot.yaw) = InterpretationService.estimate_robot_position(fast_slam.particles)
-    # else:
-    #     # Update the robot's position based on the current linear and angular velocities
-    #     robot.x += v_i * np.cos(robot.get_yaw_rad())
-    #     robot.y += v_i * np.sin(robot.get_yaw_rad())
-    #     robot.yaw = (robot.yaw + w_i) % 360
-    #
-    # # Get the weighted landmarks by clustering the landmarks based on the particle weights
-    # landmarks = InterpretationService.get_weighted_landmarks(fast_slam.particles)
+    # Iterate the FastSLAM 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
+    fast_slam.iterate(v_i, w_i, measurement_list)
+
+    # Update the robot's position based on the estimated position of the particles after a configured number of iterations
+    if iteration >= MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION and len(landmarks) > 3:
+        (robot.x, robot.y, robot.yaw) = InterpretationService.estimate_robot_position(fast_slam.particles)
+    else:
+        # Update the robot's position based on the current linear and angular velocities
+        robot.x += v_i * np.cos(robot.get_yaw_rad())
+        robot.y += v_i * np.sin(robot.get_yaw_rad())
+        robot.yaw = (robot.yaw + w_i) % 360
+
+    # Get the weighted landmarks by clustering the landmarks based on the particle weights
+    landmarks = InterpretationService.get_weighted_landmarks(fast_slam.particles)
 
     # Plot the map with the robot, particles, landmarks and obstacles/borders
     MapService.plot_map()
