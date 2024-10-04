@@ -12,6 +12,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from numpy import ndarray
 from scipy import ndimage
+from scipy.cluster.hierarchy import average
 from sklearn.cluster import DBSCAN
 
 
@@ -501,7 +502,78 @@ class MapService:
             draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=color)
 
 
-# endregion
+class ValidationService:
+    @staticmethod
+    def validate_robot():
+        # Get the actual position of the robot. Apply offset of start position (x=-1, y=1.5) so the robot starts at the origin (0, 0)
+        actual_pos = Robot(
+            HAL.getPose3d().x + 1,
+            HAL.getPose3d().y - 1.5,
+            HAL.getPose3d().yaw
+        )
+
+        # Calculate the deviation of the x coordinate in percentage
+        x_deviation = ValidationService.__calculate_x_deviation(actual_pos)
+
+        # Calculate the deviation of the y coordinate in percentage
+        y_deviation = ValidationService.__calculate_y_deviation(actual_pos)
+
+        # Calculate the deviation of the yaw angle in percentage
+        angular_deviation = ValidationService.__calculate_angular_deviation(actual_pos)
+
+        # Calculate the average deviation of the robot in percentage
+        average_deviation = (x_deviation + y_deviation + angular_deviation) / 3
+
+        # Print the validation results
+        print(f"\nAverage deviation: {average_deviation:.2f}%")
+        print(f"X deviation: {x_deviation:.2f}%")
+        print(f"Y deviation: {y_deviation:.2f}%")
+        print(f"Angular deviation: {angular_deviation:.2f}%")
+
+    @staticmethod
+    def __calculate_x_deviation(actual_pos: Robot):
+        # Calculate the difference (delta) between the estimated and actual x-coordinates
+        delta_x = actual_pos.x - robot.x
+
+        # Avoid division by zero; if the estimated x is zero, return 0% deviation
+        estimated_x = robot.x
+        if estimated_x == 0:
+            estimated_x = 0.1
+
+        # Calculate the deviation percentage for the x-coordinate
+        x_deviation_percentage = (abs(delta_x) / abs(estimated_x)) * 10 # Times 10 so 100% equals offset of 1 'meter'
+
+        return x_deviation_percentage
+
+    @staticmethod
+    def __calculate_y_deviation(actual_pos: Robot):
+        # Calculate the difference (delta) between the estimated and actual x-coordinates
+        delta_y = actual_pos.y - robot.y
+
+        # Avoid division by zero; if the estimated x is zero, return 0% deviation
+        estimated_y = robot.y
+        if estimated_y == 0:
+            estimated_y = 0.1
+
+        # Calculate the deviation percentage for the x-coordinate
+        y_deviation_percentage = (abs(delta_y) / abs(estimated_y)) * 10 # Times 10 so 100% equals offset of 1 'meter'
+
+        return y_deviation_percentage
+
+    @staticmethod
+    def __calculate_angular_deviation(actual_pos: Robot) -> float:
+        # Calculate the angular deviation (absolute difference between yaw angles)
+        angular_deviation = abs(actual_pos.yaw - robot.yaw)
+
+        # Normalize the angular deviation to be within the range [0, 180] degrees
+        angular_deviation = angular_deviation % 360
+        if angular_deviation > 180:
+            angular_deviation = 360 - angular_deviation
+
+        # Angular deviation percentage (relative to a full rotation of 360 degrees)
+        return (angular_deviation / 360) * 100
+
+#endregion
 
 # region FastSLAM 2.0
 class FastSLAM2:
@@ -765,6 +837,9 @@ while True:
 
     # Plot the map with the robot, particles, landmarks and obstacles/borders
     MapService.plot_map()
+
+    # Validate the robot's position based on the actual position
+    ValidationService.validate_robot()
 
     # Increase iteration
     iteration += 1
