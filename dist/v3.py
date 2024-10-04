@@ -11,8 +11,9 @@ import HAL
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from numpy import ndarray
+from scipy import ndimage
 from sklearn.cluster import DBSCAN, KMeans
-from sklearn.linear_model import RANSACRegressor
+import cv2
 
 
 # region Models
@@ -568,107 +569,90 @@ class FastSLAM2:
 
 # endregion
 
-def get_measurements_to_landmarks(scanned_points: list[Point]):
+def line_filter(points, sigma=1.0):
     """
-    This function extracts landmarks from the scanned points using RANSAC to identify lines.
-    :param scanned_points:
-    :return:
+    Glättet die Punkte mithilfe eines Gaußschen Filters.
+    Args:
+        points (ndarray): Ein Nx2 Array von [x, y] Punkten.
+        sigma (float): Die Standardabweichung des Gauß-Filters.
+    Returns:
+        ndarray: Geglättete Punkte.
     """
-    # Convert the scanned points to vectors
-    point_poses = np.array([point.pose() for point in scanned_points])
+    x_filtered = ndimage.gaussian_filter1d(points[:, 0], sigma=sigma)
+    y_filtered = ndimage.gaussian_filter1d(points[:, 1], sigma=sigma)
+    return np.vstack((x_filtered, y_filtered)).T
 
-    # Get the corner points of the lines using RANSAC
-    corners: list[tuple[float, float]] = detect_corners(point_poses[:, 0], point_poses[:, 1])
+def hough_line_detection(image):
+    # Verwende die Hough-Transformation, um Linien zu erkennen
+    edges = cv2.Canny(image, 10, 20, apertureSize=5)
+    lines = cv2.HoughLines(edges, 1, np.pi / 180, 5)
+    return lines
 
-    # Calculate the distance and angle of the corner points to the origin (0, 0)
-    measurements = []
-    for corner in corners:
-        distance = math.sqrt(corner[0] ** 2 + corner[1] ** 2)
-        angle = math.atan2(corner[1], corner[0])
-        measurements.append(Measurement(distance, angle))
+def find_intersections(lines):
+    # Finde die Schnittpunkte zwischen allen Linien
+    intersections = []
+    for i in range(len(lines)):
+        for j in range(i + 1, len(lines)):
+            rho1, theta1 = lines[i][0]
+            rho2, theta2 = lines[j][0]
 
-    return measurements
+            # Berechne die Schnittpunkte
+            A = np.array([
+                [np.cos(theta1), np.sin(theta1)],
+                [np.cos(theta2), np.sin(theta2)]
+            ])
+            b = np.array([[rho1], [rho2]])
 
+            # Lösen des linearen Gleichungssystems
+            if np.linalg.det(A) != 0:  # Falls die Matrizen invertierbar sind
+                intersection = np.linalg.solve(A, b)
+                intersections.append(intersection.flatten())
 
-def detect_corners(x, y, max_lines=5) -> list[tuple[float, float]]:
-    """
-    Detect corners in the scanned points using RANSAC.
-    :param x: The x-coordinates of the points
-    :param y: The y-coordinates of the points
-    :param max_lines: The maximum number of lines to detect
-    :return: Returns the corner points of the detected lines
-    """
-    corners: list[tuple[float, float]] = []
-    remaining_points = np.column_stack((x, y))
+    return np.array(intersections)
+# Schritt 1: Linienfilter anwenden, um die Punktdaten zu glätten
 
-    for _ in range(max_lines):
-        # Convert the remaining points to a 2D array
-        X: ndarray = remaining_points[:, 0].reshape(-1, 1)
-        Y: ndarray = remaining_points[:, 1].reshape(-1, 1)
+def get_landmarks(scanned_points: np.ndarray):
+    # Schritt 1: Finde den minimalen und maximalen Wert der Punkte, um das Bild korrekt zu erstellen
+    min_x = int(np.min(scanned_points[:, 0]))
+    min_y = int(np.min(scanned_points[:, 1]))
+    max_x = int(np.max(scanned_points[:, 0]))
+    max_y = int(np.max(scanned_points[:, 1]))
 
-        # Fit a line to the scanned points using RANSAC.
-        # The residual threshold determines how close a point has to be to the line to be considered an inlier.
-        # The min samples determine the minimum number of points that are needed to fit a line.
-        ransac = RANSACRegressor(min_samples=20, residual_threshold=0.05)
-        ransac.fit(X, Y)
+    # Verschiebung berechnen, um alle Punkte ins positive Koordinatensystem zu bringen
+    offset_x = -min_x if min_x < 0 else 0
+    offset_y = -min_y if min_y < 0 else 0
 
-        # Extract the inliers which are the points that are close to the line and the outliers
-        inlier_mask = ransac.inlier_mask_
-        outlier_mask = np.logical_not(inlier_mask)
+    # Neues Bild erstellen, welches alle Punkte enthält
+    width = max_x + offset_x + 10
+    height = max_y + offset_y + 10
+    image = np.zeros((height, width), dtype=np.uint8)
 
-        # If there are no inliers, break the loop
-        if not np.any(inlier_mask):
-            break
+    # Schritt 2: Punkte in das Bild zeichnen (unter Berücksichtigung der Verschiebung)
+    for point in scanned_points:
+        x = int(point[0]) + offset_x
+        y = int(point[1]) + offset_y
+        cv2.circle(image, (x, y), 2, 255, -1)
 
-        # Get the corner points of the line (most left and most right point)
-        inliers_x = X[inlier_mask]
-        inliers_y = Y[inlier_mask]
-        corner1: tuple[float, float] = (inliers_x.min(), inliers_y[inliers_x.argmin()][0])
-        corner2: tuple[float, float] = (inliers_x.max(), inliers_y[inliers_x.argmax()][0])
-        corners.append(corner1)
-        corners.append(corner2)
+    # Schritt 3: Hough-Transformation zur Linienerkennung
+    lines = hough_line_detection(image)
 
-        # Remove the inliers from the remaining points
-        remaining_points = remaining_points[outlier_mask]
+    if lines is not None:
+        print(len(lines))
+    else:
+        print('NONE')
 
-    return corners
+    # Schritt 4: Finde die Schnittpunkte (Eckenerkennung)
+    landmarks = []
+    if lines is not None:
+        intersections = find_intersections(lines)
 
-def ransac(x, y) -> list[Landmark]:
-    """
-    Detect corners in the scanned points using RANSAC.
-    :param x: The x-coordinates of the points
-    :param y: The y-coordinates of the points
-    :param max_lines: The maximum number of lines to detect
-    :return: Returns the corner points of the detected lines
-    """
-    new_landmarks: list[Landmark] = []
-    remaining_points = np.column_stack((x, y))
+        # Wandeln Sie Schnittpunkte in Landmark-Objekte um (unter Berücksichtigung der Verschiebung)
+        for point in intersections:
+            x = point[0] - offset_x
+            y = point[1] - offset_y
+            landmarks.append(Landmark(x=x, y=y))
 
-    # Convert the remaining points to a 2D array
-    X: ndarray = remaining_points[:, 0].reshape(-1, 1)
-    Y: ndarray = remaining_points[:, 1].reshape(-1, 1)
-
-    # Fit a line to the scanned points using RANSAC.
-    # The residual threshold determines how close a point has to be to the line to be considered an inlier.
-    # The min samples determine the minimum number of points that are needed to fit a line.
-    ransac = RANSACRegressor(min_samples=20, residual_threshold=0.05)
-    ransac.fit(X, Y)
-
-    # Extract the inliers which are the points that are close to the line and the outliers
-    inlier_mask = ransac.inlier_mask_
-
-    # If there are no inliers, break the loop
-    if not np.any(inlier_mask):
-        return []
-
-    # Get the inliers of the line as landmarks
-    inliers_x = X[inlier_mask]
-    inliers_y = Y[inlier_mask]
-    for i in range(len(inliers_x)):
-        new_landmarks.append(Landmark(float(inliers_x[i]), float(inliers_y[i])))
-
-    return new_landmarks
-
+    return landmarks
 
 def calculate_distance_and_angle(point):
     """
@@ -718,46 +702,66 @@ landmarks: list[Landmark] = []
 MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 1000
 iteration = 0
 while True:
-    # Set linear velocity
-    v_i = 0.1
+    # # Set linear velocity
+    # v_i = 0.1
+    #
+    # # Set angular velocity. If the robot hits the wall, the angular velocity will be set to 0
+    # bumper = HAL.getBumperData().state
+    # if bumper == 1:
+    #     w_i = 0.1
+    # else:
+    #     w_i = 0
+    #
+    # # Move robot
+    # HAL.setV(v_i)
+    # HAL.setW(w_i)
 
-    # Set angular velocity. If the robot hits the wall, the angular velocity will be set to 0
-    bumper = HAL.getBumperData().state
-    if bumper == 1:
-        w_i = 0.1
+    if iteration < 100:
+        HAL.setV(1.3)
+        HAL.setW(-0.5)
+        iteration += 1
+
+    elif iteration < 140:
+        HAL.setV(0)
+        HAL.setW(0)
+        iteration += 1
+
+
     else:
-        w_i = 0
+       # Get the points of scanned obstacles in the environment using the robot's laser data
+       point_list = robot.scan_environment()
 
-    # Move robot
-    HAL.setV(v_i)
-    HAL.setW(w_i)
+       point_data = np.array([point.pose() for point in point_list])
+       filtered_points = line_filter(point_data)
 
-    # Get the points of scanned obstacles in the environment using the robot's laser data
-    point_list = robot.scan_environment()
+       # Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
+       for point in filtered_points:
+           obstacles.append(Landmark(point[0], point[1]))
+       #obstacles = InterpretationService.update_obstacles(point_list)
 
-    # Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
-    obstacles = InterpretationService.update_obstacles(point_list)
+       # Get the landmarks from the scanned points using hugh transformation
+       landmarks = get_landmarks(filtered_points)
 
-    # Get the observations of the scanned landmarks
-    measurement_list = get_measurements_to_landmarks(point_list)
+       # # Get the observations of the scanned landmarks
+       # measurement_list = get_measurements_to_landmarks(point_list)
+       #
+       # # Iterate the FastSLAM 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
+       # fast_slam.iterate(v_i, w_i, measurement_list)
+       #
+       # # Update the robot's position based on the estimated position of the particles after a configured number of iterations
+       # if iteration >= MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION and len(landmarks) > 3:
+       #     (robot.x, robot.y, robot.yaw) = InterpretationService.estimate_robot_position(fast_slam.particles)
+       # else:
+       #     # Update the robot's position based on the current linear and angular velocities
+       #     robot.x += v_i * np.cos(robot.get_yaw_rad())
+       #     robot.y += v_i * np.sin(robot.get_yaw_rad())
+       #     robot.yaw = (robot.yaw + w_i) % 360
+       #
+       # # Get the weighted landmarks by clustering the landmarks based on the particle weights
+       # landmarks = InterpretationService.get_weighted_landmarks(fast_slam.particles)
 
-    # Iterate the FastSLAM 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
-    fast_slam.iterate(v_i, w_i, measurement_list)
+       # Plot the map with the robot, particles, landmarks and obstacles/borders
+       MapService.plot_map()
 
-    # Update the robot's position based on the estimated position of the particles after a configured number of iterations
-    if iteration >= MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION and len(landmarks) > 3:
-        (robot.x, robot.y, robot.yaw) = InterpretationService.estimate_robot_position(fast_slam.particles)
-    else:
-        # Update the robot's position based on the current linear and angular velocities
-        robot.x += v_i * np.cos(robot.get_yaw_rad())
-        robot.y += v_i * np.sin(robot.get_yaw_rad())
-        robot.yaw = (robot.yaw + w_i) % 360
-
-    # Get the weighted landmarks by clustering the landmarks based on the particle weights
-    landmarks = InterpretationService.get_weighted_landmarks(fast_slam.particles)
-
-    # Plot the map with the robot, particles, landmarks and obstacles/borders
-    MapService.plot_map()
-
-    # Increase iteration
-    iteration += 1
+       # Increase iteration
+       iteration += 1

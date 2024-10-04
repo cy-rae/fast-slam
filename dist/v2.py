@@ -11,6 +11,7 @@ import HAL
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from numpy import ndarray
+from scipy import ndimage
 from sklearn.cluster import DBSCAN, KMeans
 from sklearn.linear_model import RANSACRegressor
 
@@ -568,107 +569,154 @@ class FastSLAM2:
 
 # endregion
 
-def get_measurements_to_landmarks(scanned_points: list[Point]):
+def get_landmarks(scanned_points: list[Point]) -> list[Landmark]:
     """
-    This function extracts landmarks from the scanned points using RANSAC to identify lines.
-    :param scanned_points:
-    :return:
+    Extract landmarks from the scanned points using the IEPF algorithm.
+    :param scanned_points: The scanned points
+    :return: Returns a list with the extracted landmarks
     """
-    # Convert the scanned points to vectors
-    point_poses = np.array([point.pose() for point in scanned_points])
+    # Get poses of scanned points
+    point_data = np.array([point.pose() for point in scanned_points])
 
-    # Get the corner points of the lines using RANSAC
-    corners: list[tuple[float, float]] = detect_corners(point_poses[:, 0], point_poses[:, 1])
+    # Apply line filter to the scanned points to reduce noise
+    filtered_points = line_filter(point_data)
 
-    # Calculate the distance and angle of the corner points to the origin (0, 0)
-    measurements = []
-    for corner in corners:
-        distance = math.sqrt(corner[0] ** 2 + corner[1] ** 2)
-        angle = math.atan2(corner[1], corner[0])
-        measurements.append(Measurement(distance, angle))
+    # Extract line segments using the IEPF algorithm
+    line_segments = iepf(filtered_points)
 
-    return measurements
+    # Calculate intersections from the line segments
+    intersections = calculate_intersections(line_segments)
 
-
-def detect_corners(x, y, max_lines=5) -> list[tuple[float, float]]:
-    """
-    Detect corners in the scanned points using RANSAC.
-    :param x: The x-coordinates of the points
-    :param y: The y-coordinates of the points
-    :param max_lines: The maximum number of lines to detect
-    :return: Returns the corner points of the detected lines
-    """
-    corners: list[tuple[float, float]] = []
-    remaining_points = np.column_stack((x, y))
-
-    for _ in range(max_lines):
-        # Convert the remaining points to a 2D array
-        X: ndarray = remaining_points[:, 0].reshape(-1, 1)
-        Y: ndarray = remaining_points[:, 1].reshape(-1, 1)
-
-        # Fit a line to the scanned points using RANSAC.
-        # The residual threshold determines how close a point has to be to the line to be considered an inlier.
-        # The min samples determine the minimum number of points that are needed to fit a line.
-        ransac = RANSACRegressor(min_samples=20, residual_threshold=0.05)
-        ransac.fit(X, Y)
-
-        # Extract the inliers which are the points that are close to the line and the outliers
-        inlier_mask = ransac.inlier_mask_
-        outlier_mask = np.logical_not(inlier_mask)
-
-        # If there are no inliers, break the loop
-        if not np.any(inlier_mask):
-            break
-
-        # Get the corner points of the line (most left and most right point)
-        inliers_x = X[inlier_mask]
-        inliers_y = Y[inlier_mask]
-        corner1: tuple[float, float] = (inliers_x.min(), inliers_y[inliers_x.argmin()][0])
-        corner2: tuple[float, float] = (inliers_x.max(), inliers_y[inliers_x.argmax()][0])
-        corners.append(corner1)
-        corners.append(corner2)
-
-        # Remove the inliers from the remaining points
-        remaining_points = remaining_points[outlier_mask]
-
-    return corners
-
-def ransac(x, y) -> list[Landmark]:
-    """
-    Detect corners in the scanned points using RANSAC.
-    :param x: The x-coordinates of the points
-    :param y: The y-coordinates of the points
-    :param max_lines: The maximum number of lines to detect
-    :return: Returns the corner points of the detected lines
-    """
-    new_landmarks: list[Landmark] = []
-    remaining_points = np.column_stack((x, y))
-
-    # Convert the remaining points to a 2D array
-    X: ndarray = remaining_points[:, 0].reshape(-1, 1)
-    Y: ndarray = remaining_points[:, 1].reshape(-1, 1)
-
-    # Fit a line to the scanned points using RANSAC.
-    # The residual threshold determines how close a point has to be to the line to be considered an inlier.
-    # The min samples determine the minimum number of points that are needed to fit a line.
-    ransac = RANSACRegressor(min_samples=20, residual_threshold=0.05)
-    ransac.fit(X, Y)
-
-    # Extract the inliers which are the points that are close to the line and the outliers
-    inlier_mask = ransac.inlier_mask_
-
-    # If there are no inliers, break the loop
-    if not np.any(inlier_mask):
-        return []
-
-    # Get the inliers of the line as landmarks
-    inliers_x = X[inlier_mask]
-    inliers_y = Y[inlier_mask]
-    for i in range(len(inliers_x)):
-        new_landmarks.append(Landmark(float(inliers_x[i]), float(inliers_y[i])))
+    # Each intersection is a landmark
+    new_landmarks = []
+    for intersection in intersections:
+        new_landmarks.append(Landmark(intersection[0], intersection[1]))
 
     return new_landmarks
 
+def line_filter(points, sigma=1.0):
+    """
+    Apply a Gaussian filter to the points to reduce noise.
+    :param points: The points to filter
+    :param sigma: The standard deviation of the Gaussian filter
+    :return: Returns the filtered points
+    """
+    x_filtered = ndimage.gaussian_filter1d(points[:, 0], sigma=sigma)
+    y_filtered = ndimage.gaussian_filter1d(points[:, 1], sigma=sigma)
+    return np.vstack((x_filtered, y_filtered)).T
+
+def iepf(points, tolerance=0.2):
+    """
+    Extract line segments from the points using the Iterative End Point Fit algorithm.
+    :param points: The points to extract line segments from
+    :param tolerance: The tolerance for the recursive IEPF algorithm. (Default value is set to 0.2)
+    This tolerance determines the maximum distance that a point may be from a line in order to be considered part of the line.
+    :return: Returns the extracted line segments
+    """
+    def fit_line(p1, p2, point):
+        """
+
+        :param p1:
+        :param p2:
+        :param point:
+        :return:
+        """
+        return np.abs((p2[1] - p1[1]) * point[0] - (p2[0] - p1[0]) * point[1] + p2[0] * p1[1] - p2[1] * p1[0]) / np.linalg.norm(p2 - p1)
+
+    def recursive_iepf(start, end):
+        max_distance = 0
+        index = start
+
+        for i in range(start + 1, end):
+            distance = fit_line(points[start], points[end], points[i])
+            if distance > max_distance:
+                max_distance = distance
+                index = i
+
+        if max_distance > tolerance:
+            return recursive_iepf(start, index) + recursive_iepf(index, end)
+        else:
+            return [(points[start], points[end])]
+
+    return recursive_iepf(0, len(points) - 1)
+
+def calculate_intersections(line_segments):
+    corners = []
+    intersection_points = []
+
+    for i in range(len(line_segments)):
+        for j in range(i + 1, len(line_segments)):
+            seg1 = line_segments[i]
+            seg2 = line_segments[j]
+
+            if do_segments_intersect(seg1, seg2):
+                # Berechne den Schnittpunkt und füge ihn zur Liste der Schnittpunkte hinzu
+                intersection = calculate_intersection(seg1, seg2)
+                intersection_points.append(intersection)
+
+    # Kombiniere Ecken und Schnittpunkte
+    corners.extend(intersection_points)
+
+    return np.unique(corners, axis=0)  # Duplikate entfernen
+
+def do_segments_intersect(seg1, seg2):
+    p1, p2 = seg1
+    p3, p4 = seg2
+
+    def orientation(p, q, r):
+        # Berechne die Orientierung für drei Punkte
+        val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
+        if val == 0:
+            return 0  # collinear
+        return 1 if val > 0 else 2  # clockwise or counterclockwise
+
+    def on_segment(p, q, r):
+        # Prüfen, ob Punkt q auf dem Segment pr liegt
+        return (min(p[0], r[0]) <= q[0] <= max(p[0], r[0]) and
+                min(p[1], r[1]) <= q[1] <= max(p[1], r[1]))
+
+    # Berechne die 4 Orientierungen
+    o1 = orientation(p1, p2, p3)
+    o2 = orientation(p1, p2, p4)
+    o3 = orientation(p3, p4, p1)
+    o4 = orientation(p3, p4, p2)
+
+    # Allgemeiner Fall
+    if o1 != o2 and o3 != o4:
+        return True
+
+    # Sonderfälle
+    if o1 == 0 and on_segment(p1, p3, p2):
+        return True
+    if o2 == 0 and on_segment(p1, p4, p2):
+        return True
+    if o3 == 0 and on_segment(p3, p1, p4):
+        return True
+    if o4 == 0 and on_segment(p3, p2, p4):
+        return True
+
+    return False
+
+
+def calculate_intersection(seg1, seg2):
+    # Get the start and end points of the segments
+    p1, p2 = seg1
+    p3, p4 = seg2
+
+    # Calculate denominator of the intersection point which represents a measure of the direction of the two lines
+    denominator = (p1[0] - p2[0]) * (p3[1] - p4[1]) - (p1[1] - p2[1]) * (p3[0] - p4[0])
+
+    # If the denominator is 0, the lines are parallel and do not intersect
+    if denominator == 0:
+        return None
+
+    # Calculate the intersection point
+    intersect_x = ((p1[0] * p2[1] - p1[1] * p2[0]) * (p3[0] - p4[0]) - (p1[0] - p2[0]) * (
+                p3[0] * p4[1] - p3[1] * p4[0])) / denominator
+    intersect_y = ((p1[0] * p2[1] - p1[1] * p2[0]) * (p3[1] - p4[1]) - (p1[1] - p2[1]) * (
+                p3[0] * p4[1] - p3[1] * p4[0])) / denominator
+
+    return np.array([intersect_x, intersect_y])
 
 def calculate_distance_and_angle(point):
     """
@@ -718,19 +766,20 @@ landmarks: list[Landmark] = []
 MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 1000
 iteration = 0
 while True:
-    # Set linear velocity
-    v_i = 0.1
+    # # Set linear velocity
+    # v_i = 0.1
+    #
+    # # Set angular velocity. If the robot hits the wall, the angular velocity will be set to 0
+    # bumper = HAL.getBumperData().state
+    # if bumper == 1:
+    #     w_i = 0.1
+    # else:
+    #     w_i = 0
+    #
+    # # Move robot
+    # HAL.setV(v_i)
+    # HAL.setW(w_i)
 
-    # Set angular velocity. If the robot hits the wall, the angular velocity will be set to 0
-    bumper = HAL.getBumperData().state
-    if bumper == 1:
-        w_i = 0.1
-    else:
-        w_i = 0
-
-    # Move robot
-    HAL.setV(v_i)
-    HAL.setW(w_i)
 
     # Get the points of scanned obstacles in the environment using the robot's laser data
     point_list = robot.scan_environment()
@@ -738,23 +787,26 @@ while True:
     # Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
     obstacles = InterpretationService.update_obstacles(point_list)
 
-    # Get the observations of the scanned landmarks
-    measurement_list = get_measurements_to_landmarks(point_list)
+    # Get the landmarks from the scanned points using line filter and IEPF
+    landmarks = get_landmarks(point_list)
 
-    # Iterate the FastSLAM 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
-    fast_slam.iterate(v_i, w_i, measurement_list)
-
-    # Update the robot's position based on the estimated position of the particles after a configured number of iterations
-    if iteration >= MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION and len(landmarks) > 3:
-        (robot.x, robot.y, robot.yaw) = InterpretationService.estimate_robot_position(fast_slam.particles)
-    else:
-        # Update the robot's position based on the current linear and angular velocities
-        robot.x += v_i * np.cos(robot.get_yaw_rad())
-        robot.y += v_i * np.sin(robot.get_yaw_rad())
-        robot.yaw = (robot.yaw + w_i) % 360
-
-    # Get the weighted landmarks by clustering the landmarks based on the particle weights
-    landmarks = InterpretationService.get_weighted_landmarks(fast_slam.particles)
+    # # Get the observations of the scanned landmarks
+    # measurement_list = get_measurements_to_landmarks(point_list)
+    #
+    # # Iterate the FastSLAM 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
+    # fast_slam.iterate(v_i, w_i, measurement_list)
+    #
+    # # Update the robot's position based on the estimated position of the particles after a configured number of iterations
+    # if iteration >= MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION and len(landmarks) > 3:
+    #     (robot.x, robot.y, robot.yaw) = InterpretationService.estimate_robot_position(fast_slam.particles)
+    # else:
+    #     # Update the robot's position based on the current linear and angular velocities
+    #     robot.x += v_i * np.cos(robot.get_yaw_rad())
+    #     robot.y += v_i * np.sin(robot.get_yaw_rad())
+    #     robot.yaw = (robot.yaw + w_i) % 360
+    #
+    # # Get the weighted landmarks by clustering the landmarks based on the particle weights
+    # landmarks = InterpretationService.get_weighted_landmarks(fast_slam.particles)
 
     # Plot the map with the robot, particles, landmarks and obstacles/borders
     MapService.plot_map()
