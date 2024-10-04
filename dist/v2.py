@@ -6,14 +6,13 @@ The robot will move in the environment and update its position based on the obse
 """
 import math
 import random
-from math import radians
 
 import HAL
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from numpy import ndarray
 from scipy import ndimage
-from sklearn.cluster import DBSCAN, KMeans
+from sklearn.cluster import DBSCAN
 
 
 # region Models
@@ -82,7 +81,7 @@ class Landmark(Point):
     A landmark has a covariance matrix which describes the uncertainty of the landmark's position.
     """
 
-    def __init__(self, x: float, y: float, cov: ndarray = np.array([[1.0, 0], [0, 1.0]])):
+    def __init__(self, x: float, y: float, cov: ndarray = np.array([[0.1, 0], [0, 0.1]])):
         super().__init__(x, y)
         self.cov = cov
 
@@ -365,21 +364,27 @@ class InterpretationService:
         :return: Returns a list with the weighted landmarks
         """
         # Get all landmarks and the corresponding particle weights
-        landmark_poses_and_weights = [(landmark.pose(), particle.weight) for particle in particles for landmark in
-                                      particle.landmarks]
-        if len(landmark_poses_and_weights) == 0:
+        landmark_poses = [landmark for particle in particles for landmark in particle.landmarks]
+
+        x_coords = [landmark.x for landmark in landmark_poses]
+        y_coords = [landmark.y for landmark in landmark_poses]
+        points = np.column_stack((x_coords, y_coords))
+        if len(points) == 0:
             return []
-        (landmark_poses, weights) = zip(*landmark_poses_and_weights)
 
-        # Get the number of clusters based on average number of landmarks per particle
-        num_clusters = round(len(landmark_poses) / len(particles))
+        # DBSCAN anwenden
+        dbscan = DBSCAN(eps=MAXIMUM_POINT_DISTANCE, min_samples=MIN_SAMPLES).fit(points)
+        labels: ndarray = dbscan.labels_
+        unique_labels = set(labels)
 
-        # Use weighted k-means to cluster the landmarks based on the particle weights.
-        # (The random state is set for reproducibility of random results which is useful for debugging)
-        kmeans = KMeans(n_clusters=num_clusters, random_state=42).fit(landmark_poses, sample_weight=weights)
+        centroids = []
+        for label in unique_labels:
+            if label == -1:  # -1 steht für Rauschen (Outlier), diese überspringen wir
+                continue
+            cluster_points = points[labels == label]
+            centroid = np.mean(cluster_points, axis=0)
+            centroids.append(centroid)
 
-        # Return the cluster centroids which represent the weighted landmarks
-        centroids = kmeans.cluster_centers_
         return [Landmark(centroid[0], centroid[1]) for centroid in centroids]
 
     @staticmethod
@@ -546,8 +551,7 @@ class FastSLAM2:
                     # If no associated landmark was found, add a new landmark to the particle's landmarks list
                     landmark_x = particle.x + measurement.distance * math.cos(particle.get_yaw_rad() + measurement.yaw)
                     landmark_y = particle.y + measurement.distance * math.sin(particle.get_yaw_rad() + measurement.yaw)
-                    landmark_cov = np.array([[1, 0], [0, 1]])  # High uncertainty
-                    particle.landmarks.append(Landmark(landmark_x, landmark_y, landmark_cov))
+                    particle.landmarks.append(Landmark(landmark_x, landmark_y))
 
                 else:
                     # If an associated landmark was found, update the landmark's position and covariance
@@ -691,13 +695,13 @@ NUM_PARTICLES = 60
 MAXIMUM_LANDMARK_DISTANCE = 1
 
 # Distance-based clustering parameters
-MAXIMUM_POINT_DISTANCE = 0.1
-MIN_SAMPLES = 10
+MAXIMUM_POINT_DISTANCE = 2
+MIN_SAMPLES = int(NUM_PARTICLES / 2)
 
 # Translation and rotation noise represent the standard deviation of the translation and rotation.
 # The noise is used to add uncertainty to the movement of the robot and particles. It depends on the accuracy of the robot's odometry sensors.
-TRANSLATION_NOISE = 0.1
-ROTATION_NOISE = 0.1
+TRANSLATION_NOISE = 0.0
+ROTATION_NOISE = 0.0
 
 # The measurement noise of the Kalman filter depends on the laser's accuracy
 MEASUREMENT_NOISE = np.array([[0.01, 0.0], [0.0, 0.01]])
@@ -730,6 +734,7 @@ while True:
     else:
         w_i = 0
 
+    w_i, v_i = 0, 0
     # Move robot
     # HAL.setV(v_i)
     # HAL.setW(w_i)
