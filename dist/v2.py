@@ -695,7 +695,7 @@ NUM_PARTICLES = 60
 MAXIMUM_LANDMARK_DISTANCE = 1
 
 # Distance-based clustering parameters
-MAXIMUM_POINT_DISTANCE = 2
+MAXIMUM_POINT_DISTANCE = 1.8
 MIN_SAMPLES = int(NUM_PARTICLES / 2)
 
 # Translation and rotation noise represent the standard deviation of the translation and rotation.
@@ -704,7 +704,7 @@ TRANSLATION_NOISE = 0.0
 ROTATION_NOISE = 0.0
 
 # The measurement noise of the Kalman filter depends on the laser's accuracy
-MEASUREMENT_NOISE = np.array([[0.01, 0.0], [0.0, 0.01]])
+MEASUREMENT_NOISE = np.array([[0.001, 0.0], [0.0, 0.001]])
 # endregion
 
 # region FastSLAM 2.0 algorithm and objects in the environment
