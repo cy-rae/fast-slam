@@ -476,7 +476,7 @@ class MapService:
         Initialize the plot
         """
         # Image size and background color
-        width, height = 1000, 1000
+        width, height = 1500, 1500
         image = Image.new("RGB", (width, height), "white")
         draw = ImageDraw.Draw(image)
 
@@ -502,8 +502,8 @@ class MapService:
         :param scale: The scale of the arrow
         :param color: The color of the arrow
         """
-        center_x = 500  # Middle of the X-axis
-        center_y = 500  # Middle of the Y-axis
+        center_x = 750  # Middle of the X-axis
+        center_y = 750  # Middle of the Y-axis
         for obj in directed_points:
             # Calculate the start and end point of the arrow
             x_start = center_x + obj.x * 50  # Skaliere die X-Koordinate
@@ -527,8 +527,8 @@ class MapService:
         :param color: The color of the dot ('k' -> black, 'g' -> green)
         """
         for point in points:
-            x = 500 + point.x * 50  # Scale the X-coordinate
-            y = 500 - point.y * 50  # Scale the Y-coordinate
+            x = 750 + point.x * 50  # Scale the X-coordinate
+            y = 750 - point.y * 50  # Scale the Y-coordinate
             radius = 3
             draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=color)
 
