@@ -7,6 +7,7 @@ The robot will move in the environment and update its position based on the obse
 import copy
 import math
 import random
+import uuid
 
 import HAL
 import GUI
@@ -14,7 +15,6 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from numpy import ndarray
 from scipy import ndimage
-from sklearn.cluster import DBSCAN
 
 
 # region Models
@@ -27,10 +27,10 @@ class Point:
         self.x = x
         self.y = y
 
-    def pose(self):
+    def as_vector(self):
         """
-        Get the pose/mean of the point as a numpy array [x, y]
-        :return:
+        Get the pose/mean of the point as a vector [x, y].
+        :return: Returns the position of the point as a numpy array [x, y]
         """
         return np.array([self.x, self.y])
 
@@ -63,6 +63,7 @@ class Measurement:
     """
 
     def __init__(self, distance: float, yaw: float):
+        self.landmark_id: uuid.UUID = uuid.uuid4()
         self.distance = distance
         self.yaw = yaw
 
@@ -76,8 +77,9 @@ class Landmark(Point):
     A landmark has a covariance matrix which describes the uncertainty of the landmark's position.
     """
 
-    def __init__(self, x: float, y: float, cov: ndarray = np.array([[0.1, 0], [0, 0.1]])):
+    def __init__(self, identifier: uuid.UUID, x: float, y: float, cov: ndarray = np.array([[0.1, 0], [0, 0.1]])):
         super().__init__(x, y)
+        self.id = identifier
         self.cov = cov
 
 
@@ -91,32 +93,15 @@ class Particle(DirectedPoint):
         self.weight = 1.0 / NUM_PARTICLES
         self.landmarks: list[Landmark] = []
 
-    def get_associated_landmark(self, measurement: Measurement) -> int or None:
+    def get_index_of_landmark(self, landmark_id: uuid.UUID) -> int or None:
         """
-        Search for a landmark in the landmarks list that is associated with the observation that is described by the
-        passed measurement using mahalanobis distance.
-        :param measurement: The measurement of an observed landmark (distance and angle) to the robot.
-        :return: Returns None if no landmark can be found. Else, the index of the associated landmark will be returned.
+        Get the index of the landmark with the passed ID.
+        :param landmark_id: The ID of the landmark
+        :return: Returns the index of the landmark or None if the landmark is not found
         """
-        # Get the pose of the observed landmark starting from the particle
-        observed_landmark_pose = np.array([
-            self.x + measurement.distance * np.cos(self.yaw + measurement.yaw),
-            self.y + measurement.distance * np.sin(self.yaw + measurement.yaw)
-        ])
-
-        for particle_landmark in self.landmarks:
-            # Calculate the mahalanobis distance between the observed landmark and the particle's landmark
-            # using the covariance matrix of the particle's landmark
-            distance = Point.mahalanobis_distance(
-                particle_landmark.pose(),
-                observed_landmark_pose,
-                particle_landmark.cov
-            )
-
-            # Use cluster radius as threshold for association
-            if distance < MAXIMUM_LANDMARK_DISTANCE:
-                return self.landmarks.index(particle_landmark)
-
+        for i, landmark in enumerate(self.landmarks):
+            if landmark.id == landmark_id:
+                return i
         return None
 
 
@@ -236,14 +221,14 @@ class Robot(DirectedPoint):
 # region Services
 class LandmarkService:
     @staticmethod
-    def get_measurements_to_landmarks(scanned_points: list[Point]) -> tuple[list[Measurement], list[Landmark]]:
+    def get_measurements_to_landmarks(scanned_points: list[Point]) -> tuple[list[Measurement], list[Point]]:
         """
         Extract landmarks from the scanned points using the IEPF algorithm.
         :param scanned_points: The scanned points
         :return: Returns a list with the extracted landmarks
         """
         # Get poses of scanned points
-        point_data = np.array([point.pose() for point in scanned_points])
+        point_data = np.array([point.as_vector() for point in scanned_points])
 
         # Apply line filter to the scanned points to reduce noise
         filtered_points = LandmarkService.__line_filter(point_data)
@@ -260,7 +245,7 @@ class LandmarkService:
             dist, angle = LandmarkService.__calculate_distance_and_angle(float(intersection[0]), float(intersection[1]))
             measurements.append(Measurement(dist, angle))
 
-        # Get each intersection as a landmark
+        # Get each intersection as a landmark point
         observed_landmarks = [Point(float(intersection[0]), float(intersection[1])) for intersection in intersections]
 
         return measurements, observed_landmarks
@@ -393,9 +378,44 @@ class LandmarkService:
         return distance, angle
 
     @staticmethod
-    def associate_landmarks(observed_landmarks: list[Landmark]):
+    def associate_landmarks(measurements: list[Measurement], observed_landmarks: list[Point]) -> list[Measurement]:
+        """
+        Search for associated landmarks based on the observed landmarks.
+        If a landmark is found, the ID of the landmark will be referenced by the corresponding measurement.
+        Else, the measurement will reference to a new landmark.
+        :param measurements: The measurements to the observed landmarks. The landmark IDs are initially set to a new UUID.
+        :param observed_landmarks: The observed landmarks as points
+        :return: Returns the updated measurements with the associated landmark IDs
+        """
+        # Create a list to collect new landmark points
+        new_landmarks: list[Landmark] = []
 
+        for i, observed_landmark in enumerate(observed_landmarks):
+            # Append the new landmark to the list
+            new_landmark = Landmark(measurements[i].landmark_id, observed_landmark.x, observed_landmark.y)
+            new_landmarks.append(new_landmark)
 
+            # Search for associated landmarks. If a landmark is found, the ID will be overwritten
+            for landmark in landmarks:
+                # Calculate the mahalanobis distance between the observed landmark and the particle's landmark
+                # using the covariance matrix of the particle's landmark
+                distance = Point.mahalanobis_distance(
+                    landmark.as_vector(),
+                    observed_landmark.as_vector(),
+                    landmark.cov
+                )
+
+                # If the distance from the observed landmark to an existing landmark is smaller than the threshold,
+                # the landmark ID of the corresponding measurement will be overwritten with the ID of the associated landmark.
+                if distance < MAXIMUM_LANDMARK_DISTANCE:
+                    measurements[i].landmark_id = landmark.id
+                    new_landmarks.pop()  # Remove the new landmark since it is already associated with an existing landmark
+                    break
+
+        # Append the new landmarks to the existing landmarks
+        landmarks.extend(new_landmarks)
+
+        return measurements
 
 class InterpretationService:
     """
@@ -431,38 +451,6 @@ class InterpretationService:
         obstacles.extend(new_obstacles)
 
         return obstacles
-
-    @staticmethod
-    def get_weighted_landmarks(particles: list[Particle]) -> list[Landmark]:
-        """
-        Get the weighted landmarks by clustering the landmarks based on the particle weights using weighted k-means.
-        :param particles: The weighted particles that contain a map with landmarks.
-        :return: Returns a list with the weighted landmarks
-        """
-        # Get all landmarks and the corresponding particle weights
-        landmark_poses = [landmark for particle in particles for landmark in particle.landmarks]
-        print('Landmarks: ', len(landmark_poses))
-
-        x_coords = [landmark.x for landmark in landmark_poses]
-        y_coords = [landmark.y for landmark in landmark_poses]
-        points = np.column_stack((x_coords, y_coords))
-        if len(points) == 0:
-            return []
-
-        # DBSCAN anwenden
-        dbscan = DBSCAN(eps=MAXIMUM_POINT_DISTANCE, min_samples=MIN_SAMPLES).fit(points)
-        labels: ndarray = dbscan.labels_
-        unique_labels = set(labels)
-
-        centroids = []
-        for label in unique_labels:
-            if label == -1:  # -1 steht für Rauschen (Outlier), diese überspringen wir
-                continue
-            cluster_points = points[labels == label]
-            centroid = np.mean(cluster_points, axis=0)
-            centroids.append(centroid)
-
-        return [Landmark(centroid[0], centroid[1]) for centroid in centroids]
 
     @staticmethod
     def estimate_robot_position(particles: list[Particle]) -> tuple[float, float, float]:
@@ -678,7 +666,7 @@ class FastSLAM2:
         Perform one iteration of the FastSLAM 2.0 algorithm using the passed linear and angular delta values and the measurements.
         :param d_linear: linear delta value
         :param d_angular: angular delta value
-        :param measurements: list of measurements to observed landmarks (distances and angles of landmark to robot)
+        :param measurements: list of measurements to observed landmarks (distances and angles of landmark to robot and landmark ID)
         """
         # Update particle poses
         self.__move_particles(d_linear, d_angular)
@@ -686,18 +674,20 @@ class FastSLAM2:
         # Update particles (landmarks and weights)
         for measurement in measurements:
             for particle in self.particles:
-                # Try to find an associated landmark for the observed landmark in the particle's landmarks list
-                associated_landmark_index = particle.get_associated_landmark(measurement)
-                print('Associated landmark: ', associated_landmark_index)
 
+                # Search for the associated landmark by the landmark ID of the measurement
+                associated_landmark_index = particle.get_index_of_landmark(measurement.landmark_id)
+
+                # If no associated landmark is found, the measurement is referencing to a new landmark
+                # and the new landmark will be added to the particle map
                 if associated_landmark_index is None:
-                    # If no associated landmark was found, add a new landmark to the particle's landmarks list
                     landmark_x = particle.x + measurement.distance * math.cos(particle.yaw + measurement.yaw)
                     landmark_y = particle.y + measurement.distance * math.sin(particle.yaw + measurement.yaw)
-                    particle.landmarks.append(Landmark(landmark_x, landmark_y))
+                    particle.landmarks.append(Landmark(measurement.landmark_id, landmark_x, landmark_y))
 
+                # If an associated landmark is found, the particle's map will be updated based on the actual measurement
                 else:
-                    # If an associated landmark was found, update the landmark's position and covariance
+                    # Get the associated landmark
                     associated_landmark = particle.landmarks[associated_landmark_index]
 
                     # Calculate the predicted measurement of the particle and the associated landmark
@@ -722,11 +712,16 @@ class FastSLAM2:
                     innovation[1] = (innovation[1] + np.pi) % (2 * np.pi) - np.pi  # Ensure angle is between -pi and pi
 
                     # Calculate updated pose/mean and covariance of the associated landmark
-                    mean = associated_landmark.pose() + kalman_gain @ innovation
+                    mean = associated_landmark.as_vector() + kalman_gain @ innovation
                     cov = (np.eye(2) - kalman_gain @ jacobian) @ associated_landmark.cov
 
                     # Update the associated landmark
-                    particle.landmarks[associated_landmark_index] = Landmark(float(mean[0]), float(mean[1]), cov)
+                    particle.landmarks[associated_landmark_index] = Landmark(
+                        identifier=associated_landmark.id,
+                        x=float(mean[0]),
+                        y=float(mean[1]),
+                        cov=cov
+                    )
 
                     # Calculate the weight of the particle based on the likelihood of the observation
                     particle.weight *= self.__gaussian_likelihood(predicted_measurement, observation_cov,
@@ -807,8 +802,6 @@ class FastSLAM2:
         # Normalize weights
         weights = np.array([p.weight for p in self.particles])
         normalized_weights = weights / np.sum(weights)
-        # print(weights)
-        # print(normalized_weights)
 
         # Create cumulative sum array
         cumulative_sum = np.cumsum(normalized_weights)
@@ -882,14 +875,14 @@ class FastSLAM2:
 
 # region PARAMETERS
 # Number of particles
-NUM_PARTICLES = 1
+NUM_PARTICLES = 50
 
 # Distance threshold for associating landmarks to particles
 MAXIMUM_LANDMARK_DISTANCE = 1
 
 # Distance-based clustering parameters
 MAXIMUM_POINT_DISTANCE = 1.8
-MIN_SAMPLES = int(NUM_PARTICLES / 2)+1
+MIN_SAMPLES = int(NUM_PARTICLES / 2)
 
 # Translation and rotation noise represent the standard deviation of the translation and rotation.
 # The noise is used to add uncertainty to the movement of the robot and particles. It depends on the accuracy of the robot's odometry sensors.
@@ -927,11 +920,11 @@ while True:
     # TODO:Remove; Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
     obstacles = InterpretationService.update_obstacles(point_list)
 
-    # Get the landmarks from the scanned points using line filter and IEPF
-    measurement_list, observed_landmarks = LandmarkService.get_measurements_to_landmarks(point_list)
+    # Search for landmarks in the scanned points using line filter and IEPF and get the measurements to them and their points
+    measurement_list, landmark_points = LandmarkService.get_measurements_to_landmarks(point_list)
 
-    # Get landmark IDs
-    landmark_ids = LandmarkService.associate_landmarks(observed_landmarks)
+    # Update the landmark ID in the measurements if they are referencing to an existing landmark
+    measurement_list = LandmarkService.associate_landmarks(measurement_list, landmark_points)
 
     # Iterate the FastSLAM 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
     fast_slam.iterate(delta_linear, delta_angular, measurement_list)
@@ -944,9 +937,6 @@ while True:
         robot.yaw = (robot.yaw + delta_angular + np.pi) % (2 * np.pi) - np.pi # Ensure yaw stays between -pi and pi
         robot.x += delta_linear * np.cos(robot.yaw)
         robot.y += delta_linear * np.sin(robot.yaw)
-
-    # Get the weighted landmarks by clustering the landmarks based on the particle weights
-    landmarks = InterpretationService.get_weighted_landmarks(fast_slam.particles)
 
     # Plot the map with the robot, particles, landmarks and obstacles/borders
     MapService.plot_map()
