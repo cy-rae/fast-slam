@@ -7,7 +7,6 @@ The robot will move in the environment and update its position based on the obse
 import copy
 import math
 import random
-import time
 
 import HAL
 import GUI
@@ -220,7 +219,6 @@ class Robot(DirectedPoint):
     def __calculate_linear_delta(self, x_curr: float, y_curr: float):
         """
         Calculate the linear velocity of the robot based on the current and previous pose.
-        :param delta_t: Time difference
         :param x_curr: Current x-coordinate
         :param y_curr: Current y-coordinate
         :return: Returns the linear velocity of the robot
@@ -407,9 +405,9 @@ class InterpretationService:
         global_points: list[Point] = []
         for scanned_obstacle in scanned_obstacles:
             x_global = robot.x + (
-                    scanned_obstacle.x * np.cos(robot.get_yaw_rad()) - scanned_obstacle.y * np.sin(robot.get_yaw_rad()))
+                    scanned_obstacle.x * np.cos(robot.yaw) - scanned_obstacle.y * np.sin(robot.yaw))
             y_global = robot.y + (
-                    scanned_obstacle.x * np.sin(robot.get_yaw_rad()) + scanned_obstacle.y * np.cos(robot.get_yaw_rad()))
+                    scanned_obstacle.x * np.sin(robot.yaw) + scanned_obstacle.y * np.cos(robot.yaw))
             global_points.append(Point(x_global, y_global))
 
         # Round the coordinates of the scanned obstacles to 2 decimal places to add noise to the data.
@@ -481,6 +479,7 @@ class InterpretationService:
         x_mean /= total_weight
         y_mean /= total_weight
         yaw_mean /= total_weight
+        yaw_mean = (yaw_mean + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw is between -pi and pi
 
         return x_mean, y_mean, yaw_mean
 
@@ -545,18 +544,18 @@ class MapService:
         center_y = 750  # Middle of the Y-axis
         for obj in directed_points:
             # Calculate the start and end point of the arrow
-            x_start = center_x + obj.x * 50  # Skaliere die X-Koordinate
-            y_start = center_y - obj.y * 50  # Skaliere die Y-Koordinate
-            x_end = x_start + np.cos(obj.get_yaw_rad()) * scale
-            y_end = y_start - np.sin(obj.get_yaw_rad()) * scale
+            x_start = center_x + obj.x * 50  # Scale the X-coordinate
+            y_start = center_y - obj.y * 50  # Scale the Y-coordinate
+            x_end = x_start + np.cos(obj.yaw) * scale
+            y_end = y_start - np.sin(obj.yaw) * scale
             # Draw the arrow
             draw.line((x_start, y_start, x_end, y_end), fill=color, width=3)
             # Draw the arrow head
             arrow_size = 5
-            draw.line((x_end, y_end, x_end - arrow_size * np.cos(obj.get_yaw_rad() + np.pi / 6),
-                       y_end + arrow_size * np.sin(obj.get_yaw_rad() + np.pi / 6)), fill=color, width=3)
-            draw.line((x_end, y_end, x_end - arrow_size * np.cos(obj.get_yaw_rad() - np.pi / 6),
-                       y_end + arrow_size * np.sin(obj.get_yaw_rad() - np.pi / 6)), fill=color, width=3)
+            draw.line((x_end, y_end, x_end - arrow_size * np.cos(obj.yaw + np.pi / 6),
+                       y_end + arrow_size * np.sin(obj.yaw + np.pi / 6)), fill=color, width=3)
+            draw.line((x_end, y_end, x_end - arrow_size * np.cos(obj.yaw - np.pi / 6),
+                       y_end + arrow_size * np.sin(obj.yaw - np.pi / 6)), fill=color, width=3)
 
     @staticmethod
     def __plot_as_dots(draw: ImageDraw.Draw, points: list[Point], color: str):
@@ -583,13 +582,13 @@ class EvaluationService:
         )
 
         # Calculate the deviation of the x coordinate in percentage
-        x_deviation = EvaluationService.__calculate_x_deviation(actual_pos)
+        x_deviation = EvaluationService.__calculate_linear_deviation(actual_pos.x, robot.x)
 
         # Calculate the deviation of the y coordinate in percentage
-        y_deviation = EvaluationService.__calculate_y_deviation(actual_pos)
+        y_deviation = EvaluationService.__calculate_linear_deviation(actual_pos.y, robot.y)
 
         # Calculate the deviation of the yaw angle in percentage
-        angular_deviation = EvaluationService.__calculate_angular_deviation(actual_pos)
+        angular_deviation = EvaluationService.__calculate_angular_deviation(actual_pos.yaw)
 
         # Calculate the average deviation of the robot in percentage
         average_deviation = (x_deviation + y_deviation + angular_deviation) / 3
@@ -601,47 +600,39 @@ class EvaluationService:
         # print(f"Angular deviation: {angular_deviation:.2f}%")
 
     @staticmethod
-    def __calculate_x_deviation(actual_pos: Robot):
+    def __calculate_linear_deviation(actual: float, estimated: float):
+        """
+        Calculate the linear deviation of the coordinate in percentage.
+        :param actual: The actual coordinate of the robot
+        :return: Returns the deviation of the x-coordinate in percentage
+        """
         # Calculate the difference (delta) between the estimated and actual x-coordinates
-        delta_x = actual_pos.x - robot.x
+        delta = actual - estimated
 
         # Avoid division by zero; if the estimated x is zero, return 0% deviation
-        estimated_x = robot.x
-        if estimated_x == 0:
-            estimated_x = 0.1
+        if estimated == 0:
+            estimated = 0.001
 
         # Calculate the deviation percentage for the x-coordinate
-        x_deviation_percentage = (abs(delta_x) / abs(estimated_x)) * 10  # Times 10 so 100% equals offset of 1 'meter'
+        x_deviation_percentage = (abs(delta) / abs(estimated)) * 10  # Times 10 so 100% equals offset of 1 'meter'
 
         return x_deviation_percentage
 
     @staticmethod
-    def __calculate_y_deviation(actual_pos: Robot):
-        # Calculate the difference (delta) between the estimated and actual x-coordinates
-        delta_y = actual_pos.y - robot.y
-
-        # Avoid division by zero; if the estimated x is zero, return 0% deviation
-        estimated_y = robot.y
-        if estimated_y == 0:
-            estimated_y = 0.1
-
-        # Calculate the deviation percentage for the x-coordinate
-        y_deviation_percentage = (abs(delta_y) / abs(estimated_y)) * 10  # Times 10 so 100% equals offset of 1 'meter'
-
-        return y_deviation_percentage
-
-    @staticmethod
-    def __calculate_angular_deviation(actual_pos: Robot) -> float:
+    def __calculate_angular_deviation(actual_yaw: float) -> float:
+        """
+        Calculate the angular deviation of the robot in percentage.
+        :param actual_yaw: The actual position of the robot
+        :return: Returns the deviation of the yaw angle in percentage
+        """
         # Calculate the angular deviation (absolute difference between yaw angles)
-        angular_deviation = abs(actual_pos.yaw - robot.yaw)
+        angular_deviation = abs(actual_yaw - robot.yaw)
 
-        # Normalize the angular deviation to be within the range [0, 180] degrees
-        angular_deviation = angular_deviation % 360
-        if angular_deviation > 180:
-            angular_deviation = 360 - angular_deviation
+        # Normalize the angular deviation to be within the range [0, 2pi] (radians)
+        angular_deviation = (angular_deviation + np.pi) % (2 * np.pi)
 
-        # Angular deviation percentage (relative to a full rotation of 360 degrees)
-        return (angular_deviation / 360) * 100
+        # Calculate the deviation percentage for the yaw angle
+        return (abs(angular_deviation) / (2 * np.pi)) * 100  # Times 100 so 100% equals 2pi radians
 
 
 # endregion
@@ -936,9 +927,9 @@ while True:
         (robot.x, robot.y, robot.yaw) = InterpretationService.estimate_robot_position(fast_slam.particles)
     else:
         # Update the robot's position based on the current linear and angular velocities
-        robot.yaw = (robot.yaw + delta_angular) % 360
-        robot.x += delta_linear * np.cos(robot.get_yaw_rad())
-        robot.y += delta_linear * np.sin(robot.get_yaw_rad())
+        robot.yaw = (robot.yaw + delta_angular + np.pi) % (2 * np.pi) - np.pi # Ensure yaw stays between -pi and pi
+        robot.x += delta_linear * np.cos(robot.yaw)
+        robot.y += delta_linear * np.sin(robot.yaw)
 
     # Get the weighted landmarks by clustering the landmarks based on the particle weights
     landmarks = InterpretationService.get_weighted_landmarks(fast_slam.particles)
