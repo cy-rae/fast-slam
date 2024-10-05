@@ -7,6 +7,7 @@ The robot will move in the environment and update its position based on the obse
 import copy
 import math
 import random
+import time
 
 import HAL
 import GUI
@@ -134,6 +135,13 @@ class Robot(DirectedPoint):
 
     def __init__(self, x=0.0, y=0.0, yaw=0.0):
         super().__init__(x, y, yaw)
+        self.x_prev = 0.0
+        self.y_prev = 0.0
+        self.yaw_prev = 0.0
+        self.timestamp_prev = 0.0
+        self.x_prev = 0.0
+        self.y_prev = 0.0
+        self.yaw_prev = 0.0
 
     @staticmethod
     def scan_environment() -> list[Point]:
@@ -163,12 +171,12 @@ class Robot(DirectedPoint):
             scanned_points.append(Point(x, y))
         return scanned_points
 
-    @staticmethod
-    def move():
+    def move(self):
         """
         Move the robot based on the bumper state.
         :return: Returns the linear and angular velocity of the robot
         """
+        # First, move robot in real world
         # Set linear and angular velocity depending on the bumper state.
         bumper_state = HAL.getBumperData().state
         if bumper_state == 1:
@@ -191,7 +199,81 @@ class Robot(DirectedPoint):
         HAL.setV(v)
         HAL.setW(w)
 
+        # Second, calculate velocities since there is no odometry data
+        return self.__simulate_odometry()
+
+    def __simulate_odometry(self):
+        """
+        Simulate odometry data by calculating the linear and angular velocity of the robot.
+        Since there is no odometry data, we have to calculate the velocities based on the current and previous pose.
+        :return: Returns the linear and angular velocity of the robot
+        """
+        # Get current pose
+        x_curr = HAL.getPose3d().x
+        y_curr = HAL.getPose3d().y
+        yaw_curr = HAL.getPose3d().yaw
+
+        # Second, calculate velocities since there is no odometry data
+        # Calculate time difference
+        timestamp_curr = time.time()
+        delta_t: float = timestamp_curr - self.timestamp_prev
+
+        # Calculate linear and angular velocity
+        v = self.__calculate_linear_velocity(delta_t, x_curr, y_curr)
+        w = self.__calculate_angular_velocity(delta_t, yaw_curr)
+
+        # Update previous values
+        self.timestamp_prev = timestamp_curr
+        self.x_prev = x_curr
+        self.y_prev = y_curr
+        self.yaw_prev = yaw_curr
+
         return v, w
+
+    def __calculate_linear_velocity(self, delta_t: float, x_curr: float, y_curr: float):
+        """
+        Calculate the linear velocity of the robot based on the current and previous pose.
+        :param delta_t: Time difference
+        :param x_curr: Current x-coordinate
+        :param y_curr: Current y-coordinate
+        :return: Returns the linear velocity of the robot
+        """
+        # Calculate the change in x and y
+        delta_x = x_curr - self.x_prev
+        delta_y = y_curr - self.y_prev
+        delta_d = np.sqrt(delta_x ** 2 + delta_y ** 2)
+
+        # Calculate the linear velocity
+        if delta_t > 0:  # Prevent division by zero
+            v = delta_d / delta_t  # Velocity in m/s
+        else:
+            v = 0.0
+
+        return v
+
+    def __calculate_angular_velocity(self, delta_t: float, yaw_curr: float):
+        """
+        Calculate the angular velocity of the robot based on the current and previous yaw angle.
+        :param delta_t: Time difference
+        :param yaw_curr: The current yaw angle of the robot
+        :return: Returns the angular velocity of the robot
+        """
+        # Calculate the change in yaw
+        d_yaw = yaw_curr - self.yaw_prev
+
+        # Normalize the change in yaw to be within the range [-180, 180] degrees
+        if d_yaw > 180:
+            d_yaw -= 360
+        elif d_yaw < -180:
+            d_yaw += 360
+
+        # Calculate the angular velocity
+        if delta_t > 0:  # Prevent division by zero
+            w = d_yaw / delta_t  # Angular velocity in rad/s
+        else:
+            w = 0.0
+
+        return w
 
 
 # endregion
@@ -458,7 +540,7 @@ class MapService:
         """
         try:
             image, draw = MapService.__init_plot()
-            MapService.__plot_as_arrows(draw, directed_points=[robot], scale=5.5,
+            MapService.__plot_as_arrows(draw, directed_points=[robot], scale=10,
                                         color='red')  # Plot the robot as a red arrow
             MapService.__plot_as_arrows(draw, directed_points=fast_slam.particles, scale=7,
                                         color='blue')  # Plot the particles as blue arrows
@@ -556,10 +638,10 @@ class ValidationService:
         average_deviation = (x_deviation + y_deviation + angular_deviation) / 3
 
         # Print the validation results
-        # print(f"\nAverage deviation: {average_deviation:.2f}%")
-        # print(f"X deviation: {x_deviation:.2f}%")
-        # print(f"Y deviation: {y_deviation:.2f}%")
-        # print(f"Angular deviation: {angular_deviation:.2f}%")
+        print(f"\nAverage deviation: {average_deviation:.2f}%")
+        print(f"X deviation: {x_deviation:.2f}%")
+        print(f"Y deviation: {y_deviation:.2f}%")
+        print(f"Angular deviation: {angular_deviation:.2f}%")
 
     @staticmethod
     def __calculate_x_deviation(actual_pos: Robot):
@@ -783,8 +865,6 @@ class FastSLAM2:
                     resampled_particles.append(self.particles[i])
                     break
 
-        print(len(resampled_particles))
-
         # Each particle gets the same weight after resampling
         for p in resampled_particles:
             p.weight = 1.0 / particle_len
@@ -797,7 +877,7 @@ class FastSLAM2:
 
         # Prevent division by zero
         sum_weights = np.sum(weights)
-        if sum_weights == 0:
+        if sum_weights == 0: # TODO
             sum_weights = 0.001
 
         normalized_weights = weights / sum_weights
@@ -813,7 +893,7 @@ class FastSLAM2:
         # Resample the particles using low variance method if the effective particle number is below the half of the total number of particles
         if N_eff < NUM_PARTICLES / 2:
             print("Resample!")
-            new_particles: list[Particle] = []  # New particles
+            new_particles: list[Particle] = [Particle(0, 0, 0)] * NUM_PARTICLES  # New particles with fixed length
             inv_num_particles = 1 / NUM_PARTICLES   # Inverse of the number of particles
             random_start_position = random.random() * inv_num_particles # Random start position
             cumulative_sum = normalized_weights[0]   # Cumulative sum will be used to select the particles
@@ -829,7 +909,6 @@ class FastSLAM2:
 
             # Update the particles and their weights
             self.particles = new_particles
-            print('New Particles:', len(self.particles))
 
 
 # endregion
@@ -847,8 +926,8 @@ MIN_SAMPLES = int(NUM_PARTICLES / 2)
 
 # Translation and rotation noise represent the standard deviation of the translation and rotation.
 # The noise is used to add uncertainty to the movement of the robot and particles. It depends on the accuracy of the robot's odometry sensors.
-TRANSLATION_NOISE = 0.001
-ROTATION_NOISE = 0.001
+TRANSLATION_NOISE = 0.01
+ROTATION_NOISE = 0.01
 
 # The measurement noise of the Kalman filter depends on the laser's accuracy
 MEASUREMENT_NOISE = np.array([[0.001, 0.0], [0.0, 0.001]])
@@ -868,7 +947,7 @@ landmarks: list[Landmark] = []
 # endregion
 
 # The minimum number of iterations before updating the robot's position based on the estimated position of the particles
-MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 100
+MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 1000000000000
 iteration = 0
 while True:
     # Move the robot with linear and angular velocities
@@ -881,19 +960,20 @@ while True:
     measurement_list = LandmarkService.get_measurements_to_landmarks(point_list)
 
     # Iterate the FastSLAM 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
-    fast_slam.iterate(v_i, w_i, measurement_list)
+    # fast_slam.iterate(v_i, w_i, measurement_list)
 
     # Update the robot's position based on the estimated position of the particles after a configured number of iterations
     if iteration >= MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION and len(landmarks) > 3:
         (robot.x, robot.y, robot.yaw) = InterpretationService.estimate_robot_position(fast_slam.particles)
     else:
         # Update the robot's position based on the current linear and angular velocities
+        robot.yaw = (robot.yaw + w_i) % 360
         robot.x += v_i * np.cos(robot.get_yaw_rad())
         robot.y += v_i * np.sin(robot.get_yaw_rad())
-        robot.yaw = (robot.yaw + w_i) % 360
+    print(robot.x, robot.y, robot.yaw)
 
     # Get the weighted landmarks by clustering the landmarks based on the particle weights
-    landmarks = InterpretationService.get_weighted_landmarks(fast_slam.particles)
+    # landmarks = InterpretationService.get_weighted_landmarks(fast_slam.particles)
 
     # Plot the map with the robot, particles, landmarks and obstacles/borders
     MapService.plot_map()
