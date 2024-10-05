@@ -4,6 +4,7 @@ You can upload this script to the JDE Robots platform and run it in the simulati
 The script will create a map with the robot, particles, landmarks, and obstacles.
 The robot will move in the environment and update its position based on the observed landmarks and the FastSLAM 2.0 algorithm.
 """
+import copy
 import math
 import random
 
@@ -161,6 +162,36 @@ class Robot(DirectedPoint):
             y = dist * math.sin(angle)
             scanned_points.append(Point(x, y))
         return scanned_points
+
+    @staticmethod
+    def move():
+        """
+        Move the robot based on the bumper state.
+        :return: Returns the linear and angular velocity of the robot
+        """
+        # Set linear and angular velocity depending on the bumper state.
+        bumper_state = HAL.getBumperData().state
+        if bumper_state == 1:
+            # If the robot hits the wall, the linear velocity will be set to 0
+            v = 0
+
+            # If the robot hits the wall, the angular velocity will be set depending on the bumper that was hit
+            bumper = HAL.getBumperData().bumper
+            if bumper == 0:  # right bumper
+                w = 1
+            else:  # left or center bumper
+                w = -1
+
+        # If the robot does not hit the wall, the linear and angular velocities will be set to 1 and 0 respectively
+        else:
+            v = 1
+            w = 0
+
+        # Move robot
+        HAL.setV(v)
+        HAL.setW(w)
+
+        return v, w
 
 
 # endregion
@@ -525,10 +556,10 @@ class ValidationService:
         average_deviation = (x_deviation + y_deviation + angular_deviation) / 3
 
         # Print the validation results
-        print(f"\nAverage deviation: {average_deviation:.2f}%")
-        print(f"X deviation: {x_deviation:.2f}%")
-        print(f"Y deviation: {y_deviation:.2f}%")
-        print(f"Angular deviation: {angular_deviation:.2f}%")
+        # print(f"\nAverage deviation: {average_deviation:.2f}%")
+        # print(f"X deviation: {x_deviation:.2f}%")
+        # print(f"Y deviation: {y_deviation:.2f}%")
+        # print(f"Angular deviation: {angular_deviation:.2f}%")
 
     @staticmethod
     def __calculate_x_deviation(actual_pos: Robot):
@@ -662,7 +693,8 @@ class FastSLAM2:
                                                                   measurement.as_vector())
 
         # Resample particles
-        self.__resample_particles()
+        # self.__resample_particles()
+        self.__resampling()
 
     def __move_particles(self, v: float, w: float):
         """
@@ -751,11 +783,53 @@ class FastSLAM2:
                     resampled_particles.append(self.particles[i])
                     break
 
+        print(len(resampled_particles))
+
         # Each particle gets the same weight after resampling
         for p in resampled_particles:
             p.weight = 1.0 / particle_len
 
         return resampled_particles
+
+    def __resampling(self):
+        # Get normalized weights of particles
+        weights = np.array([p.weight for p in self.particles])
+
+        # Prevent division by zero
+        sum_weights = np.sum(weights)
+        if sum_weights == 0:
+            sum_weights = 0.001
+
+        normalized_weights = weights / sum_weights
+
+        # Copy best particle TODO: Check if this is better than mean position
+        best_id = np.argsort(normalized_weights)[-1]
+        # estimated_R = copy.deepcopy(self.particles[best_id])
+
+        # Calculate effective particle number. This number describes how many particles are actually contributing to the estimate.
+        # A low number indicates that the particles are not well distributed and the resampling step is necessary.
+        N_eff = 1 / np.sum(normalized_weights ** 2)
+
+        # Resample the particles using low variance method if the effective particle number is below the half of the total number of particles
+        if N_eff < NUM_PARTICLES / 2:
+            print("Resample!")
+            new_particles: list[Particle] = []  # New particles
+            inv_num_particles = 1 / NUM_PARTICLES   # Inverse of the number of particles
+            random_start_position = random.random() * inv_num_particles # Random start position
+            cumulative_sum = normalized_weights[0]   # Cumulative sum will be used to select the particles
+
+            # Copy particles based on the normalized weights and the random start position
+            i = 0
+            for j in range(NUM_PARTICLES):
+                pos_cumulative_weights = random_start_position + j * inv_num_particles # Calculate a random position of the cumulative weights
+                while pos_cumulative_weights > cumulative_sum:
+                    i += 1
+                    cumulative_sum += normalized_weights[i]
+                new_particles[j] = copy.deepcopy(self.particles[i])
+
+            # Update the particles and their weights
+            self.particles = new_particles
+            print('New Particles:', len(self.particles))
 
 
 # endregion
@@ -797,29 +871,11 @@ landmarks: list[Landmark] = []
 MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 100
 iteration = 0
 while True:
-    # Set linear velocity
-    v_i = 1
-
-    # Set angular velocity. If the robot hits the wall, the angular velocity will be set to 0
-    bumper_state = HAL.getBumperData().state
-    if bumper_state == 1:
-        bumper = HAL.getBumperData().bumper
-        if bumper == 0: # right bumper
-            w_i = 1
-        else:   # left or center bumper
-            w_i = -1
-    else:
-        w_i = 0
-
-    # Move robot
-    HAL.setV(v_i)
-    HAL.setW(w_i)
+    # Move the robot with linear and angular velocities
+    v_i, w_i = robot.move()
 
     # Get the points of scanned obstacles in the environment using the robot's laser data
     point_list = robot.scan_environment()
-
-    # Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
-    # obstacles = point_list
 
     # Get the landmarks from the scanned points using line filter and IEPF
     measurement_list = LandmarkService.get_measurements_to_landmarks(point_list)
