@@ -386,7 +386,7 @@ class LandmarkService:
         :return: Returns the distance(s) and angle(s) of the point(s) to the origin (0, 0)
         """
         distance = math.sqrt(x ** 2 + y ** 2)
-        angle = math.atan2(y, x) % (2 * math.pi) - math.pi  # ensure angle is in radians and between -pi and pi
+        angle = math.atan2(y, x)
         return distance, angle
 
 
@@ -434,6 +434,7 @@ class InterpretationService:
         """
         # Get all landmarks and the corresponding particle weights
         landmark_poses = [landmark for particle in particles for landmark in particle.landmarks]
+        print('Landmarks: ', len(landmark_poses))
 
         x_coords = [landmark.x for landmark in landmark_poses]
         y_coords = [landmark.y for landmark in landmark_poses]
@@ -680,6 +681,7 @@ class FastSLAM2:
             for particle in self.particles:
                 # Try to find an associated landmark for the observed landmark in the particle's landmarks list
                 associated_landmark_index = particle.get_associated_landmark(measurement)
+                print('Associated landmark: ', associated_landmark_index)
 
                 if associated_landmark_index is None:
                     # If no associated landmark was found, add a new landmark to the particle's landmarks list
@@ -794,14 +796,12 @@ class FastSLAM2:
         Particles with lower weights are more likely to be removed. This helps to focus on the most likely particles.
         """
         particle_len = len(self.particles)
-        print(particle_len)
 
         # Normalize weights
         weights = np.array([p.weight for p in self.particles])
         normalized_weights = weights / np.sum(weights)
-        print(weights)
-        print(normalized_weights)
-
+        # print(weights)
+        # print(normalized_weights)
 
         # Create cumulative sum array
         cumulative_sum = np.cumsum(normalized_weights)
@@ -911,10 +911,14 @@ MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 100
 iteration = 0
 while True:
     # Move the robot and get the linear and angular delta values
-    delta_linear, delta_angular = robot.move()
+    # delta_linear, delta_angular = robot.move()
+    delta_linear, delta_angular = 0, 0
 
     # Get the points of scanned obstacles in the environment using the robot's laser data
     point_list = robot.scan_environment()
+
+    # TODO:Remove; Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
+    obstacles = InterpretationService.update_obstacles(point_list)
 
     # Get the landmarks from the scanned points using line filter and IEPF
     measurement_list = LandmarkService.get_measurements_to_landmarks(point_list)
