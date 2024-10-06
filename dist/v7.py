@@ -4,20 +4,17 @@ You can upload this script to the JDE Robots platform and run it in the simulati
 The script will create a map with the robot, particles, landmarks, and obstacles.
 The robot will move in the environment and update its position based on the observed landmarks and the FastSLAM 2.0 algorithm.
 """
-import copy
 import math
 import random
 import uuid
-from copy import deepcopy
 
 import HAL
-import GUI
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from numpy import ndarray
-from pandas.core.computation.expr import intersection
 from scipy import ndimage
+from sklearn.cluster import DBSCAN
 
 
 # region Models
@@ -191,7 +188,7 @@ class Robot(DirectedPoint):
         # Get current pose
         x_curr = HAL.getPose3d().x
         y_curr = HAL.getPose3d().y
-        yaw_curr = HAL.getPose3d().yaw # in radians
+        yaw_curr = HAL.getPose3d().yaw  # in radians
 
         # Calculate linear and angular velocity
         v = self.__calculate_linear_delta(x_curr, y_curr)
@@ -223,37 +220,46 @@ class Robot(DirectedPoint):
 
 # region Services
 class LandmarkService:
+    # Constants for the hough transformation
+    __padding: int = 20
+    __scale_factor: int = 100
+
     @staticmethod
-    def get_measurements_to_landmarks(scanned_points: list[Point]) -> tuple[list[Measurement], list[Point]]:
+    def get_measurements_to_landmarks(scanned_points: ndarray) -> tuple[list[Measurement], list[Point]]:
         """
-        Extract landmarks from the scanned points using the IEPF algorithm.
-        :param scanned_points: The scanned points
-        :return: Returns a list with the extracted landmarks
+        Extract landmarks from the given scanned points using hough transformation and DBSCAN clustering.
+        :param scanned_points: Scanned points in the form of a numpy array
+        :return: Returns the extracted landmarks
         """
-        # Get poses of scanned points
-        point_data = np.array([point.as_vector() for point in scanned_points])
+        # Create hough transformation image
+        image, width, height = LandmarkService.__create_hough_transformation_image(scanned_points)
 
-        # Apply line filter to the scanned points to reduce noise
-        filtered_points = LandmarkService.__line_filter(point_data)
+        # Detect lines using hough transformation
+        lines = LandmarkService.__hough_line_detection(image)
 
-        # Extract line segments using the IEPF algorithm
-        line_segments: list[tuple[ndarray, ndarray]] = LandmarkService.__get_line_segments(filtered_points)
+        # Calculate the intersection points
+        intersection_points = LandmarkService.__calculate_intersections(lines, width, height)
 
-        intersections = LandmarkService.__find_common_endpoints(line_segments)
+        # Cluster the intersection points to prevent multiple points for the same intersection
+        # which can happen when multiple lines were detected for the same edge
+        intersection_points = LandmarkService.__cluster_points(intersection_points, 10, 1)
 
-        # Each intersection is a landmark
+        # Convert the intersection points back to the original coordinate space
+        intersection_points = LandmarkService.__convert_back_to_original_space(scanned_points, intersection_points)
+
+        # Get the corners which represent the landmarks
+        corners: list[Point] = LandmarkService.__get_corners(intersection_points, scanned_points, threshold=0.2)
+
+        # Calculate the distance and angle of the corners to the origin (0, 0)
         measurements = []
-        for intersection in intersections:
-            dist, angle = LandmarkService.__calculate_distance_and_angle(float(intersection[0]), float(intersection[1]))
+        for corner in corners:
+            dist, angle = LandmarkService.__calculate_distance_and_angle(corner.x, corner.y)
             measurements.append(Measurement(dist, angle))
 
-        # Get each intersection as a landmark point
-        observed_landmarks = [Point(float(intersection[0]), float(intersection[1])) for intersection in intersections]
-
-        return measurements, observed_landmarks
+        return measurements, corners
 
     @staticmethod
-    def __line_filter(points, sigma=0.05):
+    def line_filter(points, sigma=1.0):
         """
         Apply a Gaussian filter to the points to reduce noise.
         :param points: The points to filter
@@ -265,84 +271,158 @@ class LandmarkService:
         return np.vstack((x_filtered, y_filtered)).T
 
     @staticmethod
-    def __get_line_segments(scanned_points: ndarray) -> list[ndarray]:
+    def __create_hough_transformation_image(scanned_points: np.ndarray):
         """
-        Get line segments from the scanned points using hough transformation
-        :param points: The scanned points
-        :return:
+        Create an image for the hough transformation with the scanned points.
+        :param scanned_points: The scanned points
+        :return: Returns the image for the hough transformation
         """
-        # Determine the minimum and maximum values of the points
-        min_x = int(np.min(scanned_points[:, 0] * 100))
-        min_y = int(np.min(scanned_points[:, 1] * 100))
-        max_x = int(np.max(scanned_points[:, 0] * 100))
-        max_y = int(np.max(scanned_points[:, 1] * 100))
+        # Get the scaled min and max values of the scanned points
+        min_x = int(np.min(scanned_points[:, 0] * LandmarkService.__scale_factor))
+        min_y = int(np.min(scanned_points[:, 1] * LandmarkService.__scale_factor))
+        max_x = int(np.max(scanned_points[:, 0] * LandmarkService.__scale_factor))
+        max_y = int(np.max(scanned_points[:, 1] * LandmarkService.__scale_factor))
 
-        # Calculate the offset to bring all points into the positive coordinate system for the hough transformation
+        # Calculate the offset to bring all points into the positive coordinate system for the transformation
         offset_x = -min_x if min_x < 0 else 0
         offset_y = -min_y if min_y < 0 else 0
-        offset_x += 10  # Add offset to not draw the points at the edge
-        offset_y += 10
+        offset_x += LandmarkService.__padding  # Apply padding to avoid drawing points at the edge of the image
+        offset_y += LandmarkService.__padding
 
-        # Create a new image for the hough transformation
-        width = max_x + offset_x + 20
-        height = max_y + offset_y + 20
-        image: ndarray = np.zeros((height, width), dtype=np.uint8)
+        # Create a new image for the transformation with the offsets
+        width = max_x + offset_x + LandmarkService.__padding
+        height = max_y + offset_y + LandmarkService.__padding
+        image = np.zeros((height, width), dtype=np.uint8)
 
-        # Add points to the image
+        # Scale and add the scanned points to the image as circles
         for point in scanned_points:
-            x = int(point[0] * 100) + offset_x
-            y = int(point[1] * 100) + offset_y
-            cv2.circle(image, (x, y), 2, 255, -1)
+            x = int(point[0] * LandmarkService.__scale_factor) + offset_x
+            y = int(point[1] * LandmarkService.__scale_factor) + offset_y
+            cv2.circle(image, center=(x, y), radius=2, color=255, thickness=-1)
 
-        # Apply hough transformation to the image
-        lines = LandmarkService.__hough_line_detection(image)
-
-        # TODO: Linien Schnittpunkte berechnen und mit realen Punkten vergleichen
-
-        return lines
+        return image, width, height
 
     @staticmethod
-    def __hough_line_detection(image: ndarray) -> list[ndarray]:
+    def __hough_line_detection(image):
         """
-        Apply the hough transformation to the image to detect lines
-        :param image: The image with the points as matrix
+        Detect lines in the given image using the hough transformation.
+        :param image: The image to detect lines in
         :return: Returns the detected lines
         """
-        # Extract edges using the Canny algorithm
+        # Schritt 4: Kantenextraktion mit Canny
         edges = cv2.Canny(image, 100, 150, apertureSize=3)
 
-        # Apply the hough transformation to detect lines
+        # Schritt 5: Verwende die Hough-Transformation zur Linienerkennung
         lines = cv2.HoughLines(edges, 1, np.pi / 180, 90)
 
         return lines
 
     @staticmethod
-    def __find_common_endpoints(line_segments: list[tuple[ndarray, ndarray]]) -> ndarray:
-        # Set zur Speicherung aller gemeinsamen Endpunkte
-        common_endpoints = set()
+    def __calculate_intersections(lines, width, height) -> list[tuple[float, float]]:
+        """
+        Calculate the intersection points of the given lines.
+        :param lines: The lines to calculate the intersection points for
+        :param width: The width of the image
+        :param height: The height of the image
+        :return: Returns the intersection points
+        """
+        # Check if no lines were detected
+        if lines is None:
+            return []
 
-        # Überprüfen aller Paare von Segmenten
-        for i in range(len(line_segments)):
-            for j in range(i + 1, len(line_segments)):
-                # Hole die Endpunkte der Segmente
-                p1, p2 = line_segments[i]
-                p3, p4 = line_segments[j]
+        # Calculate the intersection points of the lines
+        intersections: list[tuple[float, float]] = []
+        for i in range(len(lines)):
+            for j in range(i + 1, len(lines)):
+                # Get the rho and theta values of the lines
+                rho1, theta1 = lines[i][0]
+                rho2, theta2 = lines[j][0]
 
-                # Erstelle Sets der Endpunkte
-                endpoints1 = {tuple(p1), tuple(p2)}
-                endpoints2 = {tuple(p3), tuple(p4)}
+                # Calculate the angle difference between the lines
+                angle_diff: float = abs(theta1 - theta2)
+                angle_diff: float = min(angle_diff, np.pi - angle_diff)  # Normalize the angle difference to [0, pi]
 
-                # Finde die gemeinsamen Endpunkte
-                common_endpoint = endpoints1.intersection(endpoints2)
+                # If the angle difference is too small, the lines are almost parallel and the intersection point will be ignored
+                if angle_diff < np.deg2rad(45):
+                    continue
 
-                print('\nEndpoints 1', endpoints1)
-                print('Endpoints 2', endpoints2)
-                print('Common', common_endpoint)
+                # Calculate the coefficients of the lines
+                a1, b1 = np.cos(theta1), np.sin(theta1)
+                a2, b2 = np.cos(theta2), np.sin(theta2)
 
-                # Füge die gemeinsamen Endpunkte zum Gesamtset hinzu
-                common_endpoints.update(common_endpoint)
+                # Calculate the determinant of the lines to check if they intersect
+                determinant: float = a1 * b2 - a2 * b1
+                if abs(determinant) > 1e-10:
+                    # Calculate the intersection point
+                    x: float = (b2 * rho1 - b1 * rho2) / determinant
+                    y: float = (a1 * rho2 - a2 * rho1) / determinant
 
-        return np.array(list(common_endpoints))
+                    # Only consider intersection points within the image bounds
+                    if 0 <= x < width and 0 <= y < height:
+                        intersections.append((x, y))
+
+        return intersections
+
+    @staticmethod
+    def __cluster_points(point_list: list[tuple[float, float]], eps=10, min_samples=1) -> list[tuple[float, float]]:
+        """
+        Cluster the given points using DBSCAN.
+        :param point_list: The points to cluster
+        :param eps: The maximum distance between two samples for one to be considered as in the neighborhood of the other
+        :param min_samples: The number of samples in a neighborhood for a point to be considered as a core point
+        :return: Returns the clustered points
+        """
+        # Convert the points to a numpy array
+        points: ndarray = np.array(point_list)
+
+        # Use DBSCAN to cluster the points
+        db = DBSCAN(eps=eps, min_samples=min_samples).fit(points)
+
+        # Extract the unique cluster labels
+        labels = db.labels_
+        unique_labels = set(labels)
+
+        # Iterate through the unique clusters and collect their centroids
+        cluster_centers: list[tuple[float, float]] = []
+        for label in unique_labels:
+            # -1 is the label for noise which can be ignored
+            if label == -1:
+                continue
+
+            # Get the points which belong to the current cluster
+            cluster_points: ndarray = points[labels == label]
+
+            # Calculate centroids
+            centroids: tuple[float, float] = cluster_points.mean(axis=0)
+            cluster_centers.append(centroids)
+
+        return cluster_centers
+
+    @staticmethod
+    def __convert_back_to_original_space(scanned_points, cluster_centers):
+        """
+        Convert the clustered points back to the original coordinate space.
+        :param scanned_points: The scanned points
+        :param cluster_centers: The clustered points
+        :return:
+        """
+        original_points: list[tuple[float, float]] = []
+
+        # Calculate the offset to move all points into the correct position of the coordinate system
+        min_x = int(np.min(scanned_points[:, 0] * LandmarkService.__scale_factor))
+        min_y = int(np.min(scanned_points[:, 1] * LandmarkService.__scale_factor))
+        offset_x = -min_x if min_x < 0 else 0
+        offset_y = -min_y if min_y < 0 else 0
+        offset_x += LandmarkService.__padding
+        offset_y += LandmarkService.__padding
+
+        # Calculate the original points
+        for x, y in cluster_centers:
+            original_x = (x - offset_x) / LandmarkService.__scale_factor
+            original_y = (y - offset_y) / LandmarkService.__scale_factor
+            original_points.append((original_x, original_y))
+
+        return original_points
 
     @staticmethod
     def __calculate_distance_and_angle(x: float, y: float):
@@ -395,6 +475,31 @@ class LandmarkService:
         landmarks.extend(new_landmarks)
 
         return measurements
+
+    @staticmethod
+    def __get_corners(
+            intersection_points: list[tuple[float, float]],
+            scanned_points: ndarray,
+            threshold=0.2
+    ) -> list[Point]:
+        """
+        Search for corners in the environment based on the intersection points and the scanned points.
+        :param intersection_points: The intersection points
+        :return: Returns the corners
+        """
+        corners: list[Point] = []
+        for intersection_point in intersection_points:
+            for scanned_point in scanned_points:
+                # Calculate eucledeian distance between intersection point and scanned point.
+                distance = np.sqrt(
+                    (intersection_point[0] - scanned_point[0]) ** 2 + (intersection_point[1] - scanned_point[1]) ** 2)
+
+                # If the distance is smaller than the threshold, the intersection point is a corner
+                if distance <= threshold:
+                    corners.append(Point(intersection_point[0], intersection_point[1]))
+                    break  # Break the inner loop since the intersection point was already identified as a corner
+
+        return corners
 
 
 class InterpretationService:
@@ -715,7 +820,6 @@ class FastSLAM2:
                         # Falls die Determinante nahe Null ist, das Gewicht des Partikels extrem klein setzen
                         likelihood = 1e-10  # Um sicherzustellen, dass wir keinen Nullwert haben
 
-
                     # Update the particle weight
                     # print('\nlikelihood', likelihood)
                     particle.weight *= likelihood  # Aktualisierung des Partikelgewichts
@@ -767,7 +871,7 @@ class FastSLAM2:
         dx = landmark.x - particle.x
         dy = landmark.y - particle.y
         distance = math.sqrt(dx ** 2 + dy ** 2)
-        angle = (np.arctan2(dy, dx) - particle.yaw + np.pi) % (2 * np.pi) - np.pi # Ensure angle is between -pi and pi
+        angle = (np.arctan2(dy, dx) - particle.yaw + np.pi) % (2 * np.pi) - np.pi  # Ensure angle is between -pi and pi
         return np.array([distance, angle])
 
     @staticmethod
@@ -806,6 +910,7 @@ class FastSLAM2:
         resampled_particles = [self.particles[i] for i in indices]
 
         return resampled_particles
+
 
 # endregion
 
@@ -853,11 +958,19 @@ while True:
     # Get the points of scanned obstacles in the environment using the robot's laser data
     point_list = robot.scan_environment()
 
-    # # TODO:Remove; Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
-    obstacles = InterpretationService.update_obstacles(point_list)
+# # TODO:Remove; Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
+    # Get poses of scanned points
+    point_data = np.array([point.as_vector() for point in point_list])
+    # Apply line filter to the scanned points to reduce noise. The filtered points are represented as a 2D array of float tuples
+    filtered_points: ndarray = LandmarkService.line_filter(point_data)
+
+    # obstacles = []
+    # for point in filtered_points:
+    #     obstacles.append(Point(point[0], point[1]))
+# TODO BIS HIERHIN
 
     # Search for landmarks in the scanned points using line filter and IEPF and get the measurements to them and their points
-    measurement_list, landmark_points = LandmarkService.get_measurements_to_landmarks(point_list)
+    measurement_list, landmark_points = LandmarkService.get_measurements_to_landmarks(filtered_points)
 
     # Update the landmark ID in the measurements if they are referencing to an existing landmark
     measurement_list = LandmarkService.associate_landmarks(measurement_list, landmark_points)
@@ -870,7 +983,7 @@ while True:
         (robot.x, robot.y, robot.yaw) = InterpretationService.estimate_robot_position(fast_slam.particles)
     else:
         # Update the robot's position based on the current linear and angular velocities
-        robot.yaw = (robot.yaw + delta_angular + np.pi) % (2 * np.pi) - np.pi # Ensure yaw stays between -pi and pi
+        robot.yaw = (robot.yaw + delta_angular + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
         robot.x += delta_linear * np.cos(robot.yaw)
         robot.y += delta_linear * np.sin(robot.yaw)
 

@@ -6,6 +6,7 @@ from sklearn.cluster import DBSCAN
 
 class LandmarkService:
     __padding: int = 20
+    __scale_factor: int = 100
 
     @staticmethod
     def get_landmarks(scanned_points: np.ndarray):
@@ -14,11 +15,27 @@ class LandmarkService:
         :param scanned_points: Scanned points in the form of a numpy array
         :return: Returns the extracted landmarks
         """
-        # Get the min and max values of the scanned points
-        min_x = int(np.min(scanned_points[:, 0] * 100))
-        min_y = int(np.min(scanned_points[:, 1] * 100))
-        max_x = int(np.max(scanned_points[:, 0] * 100))
-        max_y = int(np.max(scanned_points[:, 1] * 100))
+        # Create hough transformation image
+        image, width, height = LandmarkService.__create_hough_transformation_image(scanned_points)
+
+        # Detect lines using hough transformation
+        lines = LandmarkService.__hough_line_detection(image)
+
+        # Calculate the intersection points and cluster them to prevent multiple points for the same intersection
+        # which can happen when multiple lines were detected for the same edge
+        intersection_points = LandmarkService.__calculate_intersections(lines, width, height)
+        intersection_points = LandmarkService.__cluster_points(intersection_points, 10, 1)
+
+        # Convert the intersection points back to the original coordinate space
+        return LandmarkService.__convert_back_to_original_space(scanned_points, intersection_points)
+
+    @staticmethod
+    def __create_hough_transformation_image(scanned_points: np.ndarray):
+        # Get the scaled min and max values of the scanned points
+        min_x = int(np.min(scanned_points[:, 0] * LandmarkService.__scale_factor))
+        min_y = int(np.min(scanned_points[:, 1] * LandmarkService.__scale_factor))
+        max_x = int(np.max(scanned_points[:, 0] * LandmarkService.__scale_factor))
+        max_y = int(np.max(scanned_points[:, 1] * LandmarkService.__scale_factor))
 
         # Calculate the offset to bring all points into the positive coordinate system for the transformation
         offset_x = -min_x if min_x < 0 else 0
@@ -31,42 +48,13 @@ class LandmarkService:
         height = max_y + offset_y + LandmarkService.__padding
         image = np.zeros((height, width), dtype=np.uint8)
 
-        # Add the scanned points to the image as circles
+        # Scale and add the scanned points to the image as circles
         for point in scanned_points:
-            x = int(point[0] * 100) + offset_x
-            y = int(point[1] * 100) + offset_y
+            x = int(point[0] * LandmarkService.__scale_factor) + offset_x
+            y = int(point[1] * LandmarkService.__scale_factor) + offset_y
             cv2.circle(image, center=(x, y), radius=2, color=255, thickness=-1)
 
-        # Detect lines using hough transformation
-        lines = LandmarkService.__hough_line_detection(image)
-
-        # Visualize the detected lines and intersection points
-        if lines is not None:
-            for rho, theta in lines[:, 0]:
-                a = np.cos(theta)
-                b = np.sin(theta)
-                x0 = a * rho
-                y0 = b * rho
-                x1 = int(x0 + 1000 * (-b))
-                y1 = int(y0 + 1000 * (a))
-                x2 = int(x0 - 1000 * (-b))
-                y2 = int(y0 - 1000 * (a))
-                cv2.line(image, (x1, y1), (x2, y2), 127, 1)
-
-        # Calculate the intersection points and cluster them to prevent multiple points for the same intersection
-        # which can happen when multiple lines were detected for the same edge
-        intersection_points = LandmarkService.__calculate_intersections(lines, width, height)
-        intersection_points = LandmarkService.__cluster_points(intersection_points, 10, 1)
-
-        # Represent the intersection points as circles in the image
-        for point in intersection_points:
-            cv2.circle(image, (int(point[0]), int(point[1])), 5, 200, -1)
-        plt.imshow(image, cmap='gray')
-        plt.title('Erkannte Linien und Eckpunkte')
-        plt.show()
-
-        # Convert the intersection points back to the original coordinate space
-        return LandmarkService.__convert_back_to_original_space(scanned_points, intersection_points, offset_x, offset_y, 100)
+        return image, width, height
 
     @staticmethod
     def __hough_line_detection(image):
@@ -77,9 +65,6 @@ class LandmarkService:
         """
         # Schritt 4: Kantenextraktion mit Canny
         edges = cv2.Canny(image, 100, 150, apertureSize=3)
-        plt.imshow(edges, cmap='gray')
-        plt.title('Kanten mit Canny-Algorithmus')
-        plt.show()
 
         # Schritt 5: Verwende die Hough-Transformation zur Linienerkennung
         lines = cv2.HoughLines(edges, 1, np.pi / 180, 90)
@@ -133,16 +118,16 @@ class LandmarkService:
         return intersections
 
     @staticmethod
-    def __cluster_points(points_list: list[tuple[float, float]], eps=10, min_samples=1) -> list[tuple[float, float]]:
+    def __cluster_points(point_list: list[tuple[float, float]], eps=10, min_samples=1) -> list[tuple[float, float]]:
         """
         Cluster the given points using DBSCAN.
-        :param points: The points to cluster
+        :param point_list: The points to cluster
         :param eps: The maximum distance between two samples for one to be considered as in the neighborhood of the other
         :param min_samples: The number of samples in a neighborhood for a point to be considered as a core point
         :return: Returns the clustered points
         """
         # Convert the points to a numpy array
-        points: ndarray = np.array(points_list)
+        points: ndarray = np.array(point_list)
 
         # Use DBSCAN to cluster the points
         db = DBSCAN(eps=eps, min_samples=min_samples).fit(points)
@@ -168,21 +153,18 @@ class LandmarkService:
         return cluster_centers
 
     @staticmethod
-    def __convert_back_to_original_space(scanned_points, cluster_centers, ox, oy, scale_factor=100):
+    def __convert_back_to_original_space(scanned_points, cluster_centers):
         """
         Convert the clustered points back to the original coordinate space.
         :param scanned_points: The scanned points
         :param cluster_centers: The clustered points
-        :param ox: The offset x
-        :param oy:
-        :param scale_factor:
         :return:
         """
         original_points: list[tuple[float, float]] = []
 
         # Calculate the offset to move all points into the correct position of the coordinate system
-        min_x = int(np.min(scanned_points[:, 0] * 100))
-        min_y = int(np.min(scanned_points[:, 1] * 100))
+        min_x = int(np.min(scanned_points[:, 0] * LandmarkService.__scale_factor))
+        min_y = int(np.min(scanned_points[:, 1] * LandmarkService.__scale_factor))
         offset_x = -min_x if min_x < 0 else 0
         offset_y = -min_y if min_y < 0 else 0
         offset_x += LandmarkService.__padding
@@ -190,8 +172,8 @@ class LandmarkService:
 
         # Calculate the original points
         for x, y in cluster_centers:
-            original_x = (x - offset_x) / scale_factor
-            original_y = (y - offset_y) / scale_factor
+            original_x = (x - offset_x) / LandmarkService.__scale_factor
+            original_y = (y - offset_y) / LandmarkService.__scale_factor
             original_points.append((original_x, original_y))
 
         return original_points
