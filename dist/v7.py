@@ -225,30 +225,39 @@ class LandmarkService:
     __scale_factor: int = 100
 
     @staticmethod
-    def get_measurements_to_landmarks(scanned_points: ndarray) -> tuple[list[Measurement], list[Point]]:
+    def get_measurements_to_landmarks(scanned_points: list[Point]) -> tuple[list[Measurement], list[Point]]:
         """
         Extract landmarks from the given scanned points using hough transformation and DBSCAN clustering.
+        A corner represents a landmark. The corners are calculated based on the intersection points of the scanned points.
         :param scanned_points: Scanned points in the form of a numpy array
         :return: Returns the extracted landmarks
         """
+        # Apply line filter to the scanned points to reduce noise. The filtered points are represented as a 2D array of float tuples
+        point_data = np.array([point.as_vector() for point in scanned_points])
+        filtered_points: ndarray = LandmarkService.line_filter(point_data)
+
         # Create hough transformation image
-        image, width, height = LandmarkService.__create_hough_transformation_image(scanned_points)
+        image, width, height = LandmarkService.__create_hough_transformation_image(filtered_points)
 
         # Detect lines using hough transformation
         lines = LandmarkService.__hough_line_detection(image)
 
-        # Calculate the intersection points
+        # Calculate the intersection points. If no intersection points are found, return empty lists
         intersection_points = LandmarkService.__calculate_intersections(lines, width, height)
+        print(f"Intersection points: {intersection_points}")
+        if len(intersection_points) == 0:
+            return [], []
 
         # Cluster the intersection points to prevent multiple points for the same intersection
         # which can happen when multiple lines were detected for the same edge
         intersection_points = LandmarkService.__cluster_points(intersection_points, 10, 1)
 
         # Convert the intersection points back to the original coordinate space
-        intersection_points = LandmarkService.__convert_back_to_original_space(scanned_points, intersection_points)
+        intersection_points = LandmarkService.__convert_back_to_original_space(filtered_points, intersection_points)
 
         # Get the corners which represent the landmarks
-        corners: list[Point] = LandmarkService.__get_corners(intersection_points, scanned_points, threshold=0.2)
+        corners: list[Point] = LandmarkService.__get_corners(intersection_points, filtered_points, threshold=0.2)
+        print(f"Corners: {corners}")
 
         # Calculate the distance and angle of the corners to the origin (0, 0)
         measurements = []
@@ -259,7 +268,7 @@ class LandmarkService:
         return measurements, corners
 
     @staticmethod
-    def line_filter(points, sigma=1.0):
+    def line_filter(points, sigma=0.1):
         """
         Apply a Gaussian filter to the points to reduce noise.
         :param points: The points to filter
@@ -948,29 +957,17 @@ landmarks: list[Landmark] = []
 # endregion
 
 # The minimum number of iterations before updating the robot's position based on the estimated position of the particles
-MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 1000000000
+MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 100
 iteration = 0
 while True:
     # Move the robot and get the linear and angular delta values
-    # delta_linear, delta_angular = robot.move()
-    delta_linear, delta_angular = 0, 0
+    delta_linear, delta_angular = robot.move()
 
     # Get the points of scanned obstacles in the environment using the robot's laser data
     point_list = robot.scan_environment()
 
-# # TODO:Remove; Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
-    # Get poses of scanned points
-    point_data = np.array([point.as_vector() for point in point_list])
-    # Apply line filter to the scanned points to reduce noise. The filtered points are represented as a 2D array of float tuples
-    filtered_points: ndarray = LandmarkService.line_filter(point_data)
-
-    # obstacles = []
-    # for point in filtered_points:
-    #     obstacles.append(Point(point[0], point[1]))
-# TODO BIS HIERHIN
-
     # Search for landmarks in the scanned points using line filter and IEPF and get the measurements to them and their points
-    measurement_list, landmark_points = LandmarkService.get_measurements_to_landmarks(filtered_points)
+    measurement_list, landmark_points = LandmarkService.get_measurements_to_landmarks(point_list)
 
     # Update the landmark ID in the measurements if they are referencing to an existing landmark
     measurement_list = LandmarkService.associate_landmarks(measurement_list, landmark_points)
