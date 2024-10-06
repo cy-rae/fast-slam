@@ -1,124 +1,260 @@
 ﻿import cv2
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 
-class Landmark:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-
-def hough_line_detection(image):
-    # Verwende die Hough-Transformation, um Linien zu erkennen
-    edges = cv2.Canny(image, 80, 200, apertureSize=3)  # Niedrigere Schwellenwerte für empfindlichere Kanten
-    lines = cv2.HoughLines(edges, 1, np.pi / 180, 30)  # Niedrigerer threshold für mehr Linien
-    return lines, edges
-
-
-def find_intersections(lines):
-    # Finde die Schnittpunkte zwischen allen Linien
-    intersections = []
-    for i in range(len(lines)):
-        for j in range(i + 1, len(lines)):
-            rho1, theta1 = lines[i][0]
-            rho2, theta2 = lines[j][0]
-
-            # Berechne die Schnittpunkte
-            A = np.array([
-                [np.cos(theta1), np.sin(theta1)],
-                [np.cos(theta2), np.sin(theta2)]
-            ])
-            b = np.array([[rho1], [rho2]])
-
-            # Lösen des linearen Gleichungssystems
-            if np.linalg.det(A) != 0:  # Falls die Matrizen invertierbar sind
-                intersection = np.linalg.solve(A, b)
-                intersections.append(intersection.flatten())
-
-    return np.array(intersections)
-
-
-def get_landmarks(scanned_points: np.ndarray, plot_result=True):
-    # Schritt 1: Finde den minimalen und maximalen Wert der Punkte, um das Bild korrekt zu erstellen
-    min_x = int(np.min(scanned_points[:, 0]))
-    min_y = int(np.min(scanned_points[:, 1]))
-    max_x = int(np.max(scanned_points[:, 0]))
-    max_y = int(np.max(scanned_points[:, 1]))
+def get_landmarks(scanned_points: np.ndarray):
+    # Schritt 2: Berechnen des minimalen und maximalen Werts der Punkte
+    min_x = int(np.min(scanned_points[:, 0] * 100))
+    min_y = int(np.min(scanned_points[:, 1] * 100))
+    max_x = int(np.max(scanned_points[:, 0] * 100))
+    max_y = int(np.max(scanned_points[:, 1] * 100))
 
     # Verschiebung berechnen, um alle Punkte ins positive Koordinatensystem zu bringen
     offset_x = -min_x if min_x < 0 else 0
     offset_y = -min_y if min_y < 0 else 0
+    offset_x += 10  # Offset hinzufügen, um die Punkte nicht an den Rand zu zeichnen
+    offset_y += 10  # Offset hinzufügen, um die Punkte nicht an den Rand zu zeichnen
 
     # Neues Bild erstellen, welches alle Punkte enthält
-    width = max_x + offset_x + 10
-    height = max_y + offset_y + 10
+    width = max_x + offset_x + 20
+    height = max_y + offset_y + 20
     image = np.zeros((height, width), dtype=np.uint8)
 
     # Schritt 2: Punkte in das Bild zeichnen (unter Berücksichtigung der Verschiebung)
     for point in scanned_points:
-        x = int(point[0]) + offset_x
-        y = int(point[1]) + offset_y
+        x = int(point[0] * 100) + offset_x
+        y = int(point[1] * 100) + offset_y
         cv2.circle(image, (x, y), 2, 255, -1)
 
     # Schritt 3: Hough-Transformation zur Linienerkennung
-    lines, edges = hough_line_detection(image)
+    lines = hough_line_detection(image)
 
-    # Schritt 4: Finde die Schnittpunkte (Eckenerkennung)
-    landmarks = []
+    # Visualisierung des Ergebnisses
     if lines is not None:
-        intersections = find_intersections(lines)
+        for rho, theta in lines[:, 0]:
+            a = np.cos(theta)
+            b = np.sin(theta)
+            x0 = a * rho
+            y0 = b * rho
+            x1 = int(x0 + 1000 * (-b))
+            y1 = int(y0 + 1000 * (a))
+            x2 = int(x0 - 1000 * (-b))
+            y2 = int(y0 - 1000 * (a))
+            cv2.line(image, (x1, y1), (x2, y2), 127, 1)
 
-        # Wandeln Sie Schnittpunkte in Landmark-Objekte um (unter Berücksichtigung der Verschiebung)
-        for point in intersections:
-            x = point[0] - offset_x
-            y = point[1] - offset_y
-            landmarks.append(Landmark(x=x, y=y))
+    # Bild anzeigen
+    plt.imshow(image, cmap='gray')
+    plt.title('Erkannte Linien mit Hough-Transformation')
+    plt.show()
 
-    # Schritt 5: Optionales Plotten des Bildes mit erkannten Linien und Punkten
-    if plot_result:
-        plt.figure(figsize=(10, 10))
+def hough_line_detection(image):
+    # Schritt 4: Kantenextraktion mit Canny
+    edges = cv2.Canny(image, 100, 150, apertureSize=3)
+    plt.imshow(edges, cmap='gray')
+    plt.title('Kanten mit Canny-Algorithmus')
+    plt.show()
 
-        # Zeige die ursprünglichen Punkte an
-        plt.subplot(1, 2, 1)
-        plt.title("Original Points and Edges")
-        plt.imshow(edges, cmap='gray')
+    # Schritt 5: Verwende die Hough-Transformation zur Linienerkennung
+    lines = cv2.HoughLines(edges, 1, np.pi / 180, 90)
 
-        # Zeichne die Linien auf das Bild
-        if lines is not None:
-            for line in lines:
-                rho, theta = line[0]
-                a = np.cos(theta)
-                b = np.sin(theta)
-                x0 = a * rho
-                y0 = b * rho
-                x1 = int(x0 + 1000 * (-b))
-                y1 = int(y0 + 1000 * (a))
-                x2 = int(x0 - 1000 * (-b))
-                y2 = int(y0 - 1000 * (a))
-                cv2.line(image, (x1, y1), (x2, y2), 255, 1)
+    return lines
 
-        # Zeige das Bild mit den Linien an
-        plt.subplot(1, 2, 2)
-        plt.title("Detected Lines and Points")
-        plt.imshow(image, cmap='gray')
-        plt.show()
 
-    return landmarks
-
+log = np.array([
+    [0.00602347, - 0.79963241],
+    [0.01514805, - 0.8055237],
+    [0.02867247, - 0.81425712],
+    [0.04335421, - 0.82374008],
+    [0.05847621, - 0.83350987],
+    [0.07400203, - 0.84354307],
+    [0.08995608, - 0.85385552],
+    [0.10636664, - 0.86446554],
+    [0.12326419, - 0.87539291],
+    [0.14068167, - 0.88665902],
+    [0.15865475, - 0.89828702],
+    [0.17722213, - 0.91030203],
+    [0.19642586, - 0.92273134],
+    [0.21631174, - 0.93560467],
+    [0.23692975, - 0.94895447],
+    [0.25833457, - 0.96281623],
+    [0.28058614, - 0.97722886],
+    [0.30375034, - 0.99223516],
+    [0.32789974, - 1.0078822],
+    [0.35311449, - 1.02422202],
+    [0.37948335, - 1.04131226],
+    [0.40710491, - 1.05921695],
+    [0.43608898, - 1.07800738],
+    [0.46655826, - 1.0977632],
+    [0.49865031, - 1.11857372],
+    [0.53251986, - 1.14053942],
+    [0.56834166, - 1.16377377],
+    [0.60631379, - 1.18840541],
+    [0.6466617, - 1.21458072],
+    [0.68964316, - 1.24246706],
+    [0.73555427, - 1.27225671],
+    [0.78473693, - 1.30417168],
+    [0.83758809, - 1.3384697],
+    [0.89456462, - 1.37544299],
+    [0.9559953, - 1.41515939],
+    [1.01997982, - 1.45468515],
+    [1.07695709, - 1.48111917],
+    [1.11592094, - 1.48066107],
+    [1.14035883, - 1.45980978],
+    [1.15965756, - 1.43234241],
+    [1.17797014, - 1.4041184],
+    [1.19603604, - 1.37612753],
+    [1.21392215, - 1.34842091],
+    [1.23164357, - 1.32097939],
+    [1.24921344, - 1.29378248],
+    [1.26664453, - 1.26681038],
+    [1.28394922, - 1.2400439],
+    [1.30113951, - 1.21346433],
+    [1.31822713, - 1.18705348],
+    [1.33522354, - 1.16079358],
+    [1.35213996, - 1.13466728],
+    [1.36898738, - 1.10865749],
+    [1.38577661, - 1.08274748],
+    [1.40251836, - 1.05692075],
+    [1.41922319, - 1.03116101],
+    [1.43590152, - 1.00545209],
+    [1.45256372, - 0.97977797],
+    [1.46922013, - 0.95412273],
+    [1.48588111, - 0.92847048],
+    [1.50255696, - 0.90280533],
+    [1.51925801, - 0.87711135],
+    [1.5359947, - 0.85137255],
+    [1.55277751, - 0.82557281],
+    [1.56961702, - 0.79969585],
+    [1.586524, - 0.77372523],
+    [1.60350935, - 0.74764423],
+    [1.62058416, - 0.72143587],
+    [1.63775972, - 0.69508283],
+    [1.6550476, - 0.66856742],
+    [1.67245967, - 0.64187154],
+    [1.69000809, - 0.61497659],
+    [1.70770538, - 0.58786347],
+    [1.72556444, - 0.56051247],
+    [1.74359864, - 0.53290325],
+    [1.76182177, - 0.50501474],
+    [1.78024818, - 0.47682513],
+    [1.7988872, - 0.44831073],
+    [1.81756895, - 0.41941555],
+    [1.83404744, - 0.38972639],
+    [1.83826829, - 0.3575692],
+    [1.81542213, - 0.32089447],
+    [1.76606788, - 0.28082807],
+    [1.70691232, - 0.24102014],
+    [1.64933065, - 0.20356223],
+    [1.59554145, - 0.16866662],
+    [1.54533364, - 0.13609471],
+    [1.49833829, - 0.1056044],
+    [1.45422393, - 0.0769849],
+    [1.41263899, - 0.05005288],
+    [1.37312988, - 0.02464916],
+    [1.33554473e+00, - 6.37339858e-04],
+    [1.30018419, 0.02210368],
+    [1.26690734, 0.04368899],
+    [1.23533229, 0.06422159],
+    [1.20525084, 0.0837898],
+    [1.17653644, 0.1024715],
+    [1.14908139, 0.12033651],
+    [1.12278891, 0.13744768],
+    [1.09757157, 0.15386177],
+    [1.07335027, 0.16963016],
+    [1.05005321, 0.1847995],
+    [1.02761507, 0.19941225],
+    [1.00597622, 0.21350713],
+    [0.98508215, 0.22711952],
+    [0.96488292, 0.24028186],
+    [0.94533274, 0.25302393],
+    [0.92638941, 0.26537313],
+    [0.90801407, 0.27735473],
+    [0.89017079, 0.28899205],
+    [0.87282636, 0.30030669],
+    [0.85594997, 0.31131866],
+    [0.83951301, 0.32204656],
+    [0.82348886, 0.3325077],
+    [0.80785273, 0.34271819],
+    [0.79258145, 0.35269311],
+    [0.77765337, 0.36244652],
+    [0.76304819, 0.37199163],
+    [0.74874691, 0.38134081],
+    [0.73473163, 0.39050571],
+    [0.72098551, 0.39949728],
+    [0.70749267, 0.40832585],
+    [0.69423811, 0.41700118],
+    [0.68120767, 0.42553251],
+    [0.6683879, 0.43392859],
+    [0.65576603, 0.44219774],
+    [0.64332994, 0.45034785],
+    [0.63106808, 0.45838648],
+    [0.61896943, 0.4663208],
+    [0.60702346, 0.47415768],
+    [0.59522006, 0.48190373],
+    [0.58354958, 0.48956524],
+    [0.57200269, 0.49714831],
+    [0.56057045, 0.50465879],
+    [0.54924421, 0.51210232],
+    [0.53801561, 0.51948437],
+    [0.52687654, 0.52681025],
+    [0.51581917, 0.53408511],
+    [0.50483584, 0.54131395],
+    [0.4939191, 0.54850169],
+    [0.48306166, 0.55565309],
+    [0.47225637, 0.56277284],
+    [0.46149623, 0.56986554],
+    [0.45077434, 0.57693573],
+    [0.44008391, 0.58398788],
+    [0.42941821, 0.59102643],
+    [0.41877058, 0.59805578],
+    [0.40813439, 0.60508028],
+    [0.39750306, 0.61210429],
+    [0.38686999, 0.61913216],
+    [0.3762286, 0.62616825],
+    [0.36557228, 0.63321693],
+    [0.35489437, 0.6402826],
+    [0.34418818, 0.64736972],
+    [0.33344692, 0.65448277],
+    [0.32266372, 0.6616263],
+    [0.31183161, 0.66880495],
+    [0.3009435, 0.67602343],
+    [0.28999214, 0.68328658],
+    [0.27897013, 0.69059933],
+    [0.26786987, 0.69796672],
+    [0.25668355, 0.70539394],
+    [0.24540316, 0.71288635],
+    [0.23402041, 0.72044948],
+    [0.22252675, 0.72808904],
+    [0.21091329, 0.73581096],
+    [0.19917083, 0.74362137],
+    [0.1872898, 0.75152669],
+    [0.17526024, 0.75953358],
+    [0.16307171, 0.76764903],
+    [0.15071334, 0.7758803],
+    [0.13817371, 0.78423502],
+    [0.12544085, 0.79272123],
+    [0.11250217, 0.80134735],
+    [0.09934442, 0.81012229],
+    [0.0859536, 0.8190554],
+    [0.07231493, 0.8281566],
+    [0.0584148, 0.83743502],
+    [0.04430362, 0.84685699],
+    [0.03077833, 0.85589002],
+    [0.02141364, 0.86214535]
+])
 
 # Beispielaufruf
 if __name__ == "__main__":
-    # Beispiel-Punktwolke (sehr dichte Punkte)
-    scanned_points = np.array([
-                                  (x, 50) for x in range(0, 71)
-                              ] + [
-                                  (70, y) for y in range(50, -1, -1)
-                              ])
+    # Schritt 1: Visualisiere die originalen Punkte
+    plt.figure(figsize=(8, 6))
+    plt.scatter(log[:, 0], log[:, 1], color='blue', s=10, label='Originalpunkte')
+    plt.title('Originale Punkte')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.grid(True)
+    plt.legend()
+    plt.gca().invert_yaxis()  # Invertiere die Y-Achse, um das Bild wie im OpenCV-Bild zu orientieren
+    plt.show()
 
-    landmarks = get_landmarks(scanned_points)
-
-    # Ausgabe der gefundenen Landmarken
-    print('Landmarken:')
-    for landmark in landmarks:
-        print(f"Landmark: x={landmark.x:.2f}, y={landmark.y:.2f}")
+    get_landmarks(log)

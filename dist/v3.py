@@ -583,9 +583,21 @@ def line_filter(points, sigma=1.0):
     return np.vstack((x_filtered, y_filtered)).T
 
 def hough_line_detection(image):
-    # Verwende die Hough-Transformation, um Linien zu erkennen
-    edges = cv2.Canny(image, 10, 20, apertureSize=5)
-    lines = cv2.HoughLines(edges, 1, np.pi / 180, 5)
+    # Schritt 1: Weichzeichnen des Bildes, um Rauschen zu reduzieren
+    blurred = cv2.GaussianBlur(image, (5, 5), 0)
+
+    # Schritt 2: Verwende die Canny-Kantendetektion
+    edges = cv2.Canny(blurred, 50, 150, apertureSize=3)
+    print('edges:', edges)
+
+    # Schritt 3: Hough-Transformation zur Linienerkennung
+    rho = 1                # Abstand-Auflösung in Pixel
+    theta = np.pi / 180    # Winkelauflösung in Radianten
+    threshold = 10         # Mindestanzahl der Stimmen, um eine Linie zu akzeptieren
+
+    lines = cv2.HoughLines(edges, rho, theta, threshold)
+    print('lines:', lines)
+
     return lines
 
 def find_intersections(lines):
@@ -623,8 +635,8 @@ def get_landmarks(scanned_points: np.ndarray):
     offset_y = -min_y if min_y < 0 else 0
 
     # Neues Bild erstellen, welches alle Punkte enthält
-    width = max_x + offset_x + 10
-    height = max_y + offset_y + 10
+    width = max_x + offset_x + 20  # zusätzliche Polsterung, um sicherzustellen, dass alle Punkte im Bild sind
+    height = max_y + offset_y + 20
     image = np.zeros((height, width), dtype=np.uint8)
 
     # Schritt 2: Punkte in das Bild zeichnen (unter Berücksichtigung der Verschiebung)
@@ -635,11 +647,6 @@ def get_landmarks(scanned_points: np.ndarray):
 
     # Schritt 3: Hough-Transformation zur Linienerkennung
     lines = hough_line_detection(image)
-
-    if lines is not None:
-        print(len(lines))
-    else:
-        print('NONE')
 
     # Schritt 4: Finde die Schnittpunkte (Eckenerkennung)
     landmarks = []

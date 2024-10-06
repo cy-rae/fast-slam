@@ -8,14 +8,12 @@ import copy
 import math
 import random
 import uuid
-from copy import deepcopy
 
 import HAL
 import GUI
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from numpy import ndarray
-from pandas.core.computation.expr import intersection
 from scipy import ndimage
 
 
@@ -238,10 +236,8 @@ class LandmarkService:
         # Extract line segments using the IEPF algorithm
         line_segments: list[tuple[ndarray, ndarray]] = LandmarkService.__iepf(filtered_points)
 
-        intersections = LandmarkService.__find_common_endpoints(line_segments)
-
-        # # Calculate intersections from the line segments
-        # intersections: list[ndarray] = LandmarkService.__calculate_intersections(line_segments)
+        # Calculate intersections from the line segments
+        intersections: list[ndarray] = LandmarkService.__calculate_intersections(line_segments)
 
         # Each intersection is a landmark
         measurements = []
@@ -317,34 +313,6 @@ class LandmarkService:
         return recursive_iepf(0, len(points) - 1)
 
     @staticmethod
-    def __find_common_endpoints(line_segments: list[tuple[ndarray, ndarray]]) -> ndarray:
-        # Set zur Speicherung aller gemeinsamen Endpunkte
-        common_endpoints = set()
-
-        # Überprüfen aller Paare von Segmenten
-        for i in range(len(line_segments)):
-            for j in range(i + 1, len(line_segments)):
-                # Hole die Endpunkte der Segmente
-                p1, p2 = line_segments[i]
-                p3, p4 = line_segments[j]
-
-                # Erstelle Sets der Endpunkte
-                endpoints1 = {tuple(p1), tuple(p2)}
-                endpoints2 = {tuple(p3), tuple(p4)}
-
-                # Finde die gemeinsamen Endpunkte
-                common_endpoint = endpoints1.intersection(endpoints2)
-
-                print('\nEndpoints 1', endpoints1)
-                print('Endpoints 2', endpoints2)
-                print('Common', common_endpoint)
-
-                # Füge die gemeinsamen Endpunkte zum Gesamtset hinzu
-                common_endpoints.update(common_endpoint)
-
-        return np.array(list(common_endpoints))
-
-    @staticmethod
     def __calculate_intersections(line_segments: list[tuple[ndarray, ndarray]]) -> list[ndarray]:
         """
         Calculate the intersections of the line segments.
@@ -362,41 +330,6 @@ class LandmarkService:
 
         return intersections
 
-    # @staticmethod
-    # def calculate_intersection(seg1: tuple[ndarray, ndarray], seg2: tuple[ndarray, ndarray]) -> ndarray or None:
-    #     """
-    #     Calculate the intersection point of two line segments.
-    #     :param seg1: Contains the start and end point of the first line segment
-    #     :param seg2: Contains the start and end point of the second line segment
-    #     :return: Returns the intersection point of the two line segments or None if the lines do not intersect
-    #     """
-    #     # Get the start and end points of the segments
-    #     p1, p2 = seg1
-    #     p3, p4 = seg2
-    #
-    #     # Calculate the direction vectors of the segments
-    #     d1 = p2 - p1  # Direction from P1 to P2
-    #     d2 = p4 - p3  # Direction from P3 to P4
-    #
-    #     # Calculate the denominator which represents a measurement of the direction of the lines
-    #     denominator = d1[0] * d2[1] - d1[1] * d2[0]
-    #
-    #     # If the denominator is 0, the lines are parallel and will never intersect
-    #     if denominator == 0:
-    #         return None
-    #
-    #     # Calculate parameter t and u. These parameters represent the position of the intersection point on the lines
-    #     t = ((p3[0] - p1[0]) * d2[1] - (p3[1] - p1[1]) * d2[0]) / denominator
-    #     u = ((p3[0] - p1[0]) * d1[1] - (p3[1] - p1[1]) * d1[0]) / denominator
-    #
-    #     # Check if the intersection point lies within the segment boundaries
-    #     if 0 <= t <= 1 and 0 <= u <= 1:
-    #         intersection_x = p1[0] + t * d1[0]
-    #         intersection_y = p1[1] + t * d1[1]
-    #         return np.array([intersection_x, intersection_y])
-    #
-    #     return None  # Return None if the lines do not intersect
-
     @staticmethod
     def calculate_intersection(seg1: tuple[ndarray, ndarray], seg2: tuple[ndarray, ndarray]) -> ndarray or None:
         """
@@ -409,15 +342,28 @@ class LandmarkService:
         p1, p2 = seg1
         p3, p4 = seg2
 
-        # Berechnung der Determinante
-        denom = (p1[0] - p2[0]) * (p3[1] - p4[1]) - (p1[1] - p2[1]) * (p3[0] - p4[0])
-        if denom == 0:
-            return None  # Linien sind parallel oder überlappen sich
+        # Calculate the direction vectors of the segments
+        d1 = p2 - p1  # Direction from P1 to P2
+        d2 = p4 - p3  # Direction from P3 to P4
 
-        # Berechnung des Schnittpunkts
-        px = ((p1[0] * p2[1] - p1[1] * p2[0]) * (p3[0] - p4[0]) - (p1[0] - p2[0]) * (p3[0] * p4[1] - p3[1] * p4[0])) / denom
-        py = ((p1[0] * p2[1] - p1[1] * p2[0]) * (p3[1] - p4[1]) - (p1[1] - p2[1]) * (p3[0] * p4[1] - p3[1] * p4[0])) / denom
-        return int(px), int(py)
+        # Calculate the denominator which represents a measurement of the direction of the lines
+        denominator = d1[0] * d2[1] - d1[1] * d2[0]
+
+        # If the denominator is 0, the lines are parallel and will never intersect
+        if denominator == 0:
+            return None
+
+        # Calculate parameter t and u. These parameters represent the position of the intersection point on the lines
+        t = ((p3[0] - p1[0]) * d2[1] - (p3[1] - p1[1]) * d2[0]) / denominator
+        u = ((p3[0] - p1[0]) * d1[1] - (p3[1] - p1[1]) * d1[0]) / denominator
+
+        # Check if the intersection point lies within the segment boundaries
+        if 0 <= t <= 1 and 0 <= u <= 1:
+            intersection_x = p1[0] + t * d1[0]
+            intersection_y = p1[1] + t * d1[1]
+            return np.array([intersection_x, intersection_y])
+
+        return None  # Return None if the lines do not intersect
 
     @staticmethod
     def __calculate_distance_and_angle(x: float, y: float):
@@ -471,7 +417,6 @@ class LandmarkService:
 
         return measurements
 
-
 class InterpretationService:
     """
     Service class to interpret the results of the FastSLAM 2.0 algorithm.
@@ -519,7 +464,7 @@ class InterpretationService:
         y_mean = 0.0
         yaw_mean = 0.0
         total_weight = sum(p.weight for p in particles)
-        # print(total_weight)
+        print(total_weight)
 
         # Calculate the mean of the particles
         for p in particles:
@@ -699,23 +644,23 @@ class FastSLAM2:
         """
         Initialize the FastSLAM 2.0 algorithm with the specified number of particles.
         """
-        # self.particles: list[Particle] = [
-        #     Particle(
-        #         random.uniform(-4.1, 5.8),  # random x value
-        #         random.uniform(-4.5, 5.5),  # random y value
-        #         random.uniform(0, 360),  # random yaw value
-        #     ) for _ in range(NUM_PARTICLES)
-        # ]
-
-        # Initialize particles with random values near the origin (0, 0, 0). A small variance will be used to add noise to the initial values.
-        rng = np.random.default_rng(42)
         self.particles: list[Particle] = [
             Particle(
-                x=rng.normal(0.0, INITIAL_POSITION_VAR),
-                y=rng.normal(0.0, INITIAL_POSITION_VAR),
-                yaw=rng.normal(0.0, INITIAL_YAW_VAR),
+                random.uniform(-4.1, 5.8),  # random x value
+                random.uniform(-4.5, 5.5),  # random y value
+                random.uniform(0, 360),  # random yaw value
             ) for _ in range(NUM_PARTICLES)
         ]
+
+        # # Initialize particles with random values near the origin (0, 0, 0). A small variance will be used to add noise to the initial values.
+        # rng = np.random.default_rng(42)
+        # self.particles: list[Particle] = [
+        #     Particle(
+        #         x=rng.normal(0.0, 0.1),
+        #         y=rng.normal(0.0, 0.1),
+        #         yaw=rng.normal(0.0, 0.1),
+        #     ) for _ in range(NUM_PARTICLES)
+        # ]
 
     def iterate(self, d_linear: float, d_angular: float, measurements: list[Measurement]):
         """
@@ -753,48 +698,26 @@ class FastSLAM2:
                     innovation = measurement.as_vector() - predicted_measurement
                     innovation[1] = (innovation[1] + np.pi) % (2 * np.pi) - np.pi  # Ensure angle is between -pi and pi
 
-                    # Calculate the Jacobian matrix of the particle and the associated landmark.
-                    # Jacobian describes how changes in the state of the robot influence the measured observations.
-                    # It helps to link the uncertainties in the estimates with the uncertainties in the measurements
-                    jacobian = self.__compute_jacobian(particle, associated_landmark)
+                    # Erstellen der Kovarianzmatrix (2x2)
+                    covariance_inv = np.linalg.inv(MEASUREMENT_NOISE)
+                    diff = np.array([innovation[0], innovation[1]])
 
-                    # Calculate the covariance of the observation which depends on the Jacobian matrix,
-                    # the covariance of the landmark and the measurement noise
-                    observation_cov = jacobian @ associated_landmark.cov @ jacobian.T + MEASUREMENT_NOISE
+                    # Wahrscheinlichkeitsdichte berechnen
+                    particle.weight *= np.exp(-0.5 * diff.T @ covariance_inv @ diff) / np.sqrt(np.linalg.det(2 * np.pi * MEASUREMENT_NOISE))
 
-                    # Calculate the Kalman gain which is used to update the pose/mean and covariance of the associated landmark.
-                    # It determines how much the actual measurement should be trusted compared to the predicted measurement.
-                    # Thus, it determines how much the landmark should be updated based on the actual measurement.
-                    kalman_gain = associated_landmark.cov @ jacobian.T @ np.linalg.inv(observation_cov)
-
-                    # Calculate updated pose/mean and covariance of the associated landmark
-                    mean = associated_landmark.as_vector() + kalman_gain @ innovation
-                    cov = (np.eye(2) - kalman_gain @ jacobian) @ associated_landmark.cov
-
-                    # Update the associated landmark
-                    particle.landmarks[associated_landmark_index] = Landmark(
-                        identifier=associated_landmark.id,
-                        x=float(mean[0]),
-                        y=float(mean[1]),
-                        cov=cov
+                    # Berechnung der erwarteten Landmarkenposition
+                    expected_position = (
+                        particle.x + measurement.distance * np.cos(particle.yaw + measurement.yaw),
+                        particle.y + measurement.distance * np.sin(particle.yaw + measurement.yaw),
                     )
 
-                    # Berechnung des Wahrscheinlichkeitsdichtewerts der Innovation unter der Annahme einer Gaußverteilung
-                    det_observation_cov = np.linalg.det(observation_cov)
-
-                    if det_observation_cov > 0:  # Sicherstellen, dass die Determinante positiv ist
-                        norm_factor = 1.0 / np.sqrt((2 * np.pi) ** 2 * det_observation_cov)
-                        exponent = -0.5 * innovation.T @ np.linalg.inv(observation_cov) @ innovation
-                        likelihood = norm_factor * np.exp(exponent)
-                    else:
-                        # Falls die Determinante nahe Null ist, das Gewicht des Partikels extrem klein setzen
-                        likelihood = 1e-10  # Um sicherzustellen, dass wir keinen Nullwert haben
-
-
-                    # Update the particle weight
-                    # print('\nlikelihood', likelihood)
-                    particle.weight *= likelihood  # Aktualisierung des Partikelgewichts
-                    # print('nw', particle.weight)
+                    # Anpassung der Landmarkenposition
+                    # Hier verwenden wir eine einfache Mittelwertbildung zwischen der bekannten und der erwarteten Position
+                    particle.landmarks[associated_landmark_index] = Landmark(
+                        associated_landmark.id,
+                        (associated_landmark.x + expected_position[0]) / 2,
+                        (associated_landmark.y + expected_position[1]) / 2
+                    )
 
         # Normalisieren der Gewichte
         total_weight = sum(particle.weight for particle in self.particles)
@@ -802,19 +725,9 @@ class FastSLAM2:
             for particle in self.particles:
                 particle.weight /= total_weight
 
-        weights = np.array([particle.weight for particle in self.particles])
-        # print('\nNW', weights)
-
-        # Überprüfen der Summe der Gewichte
-        if np.sum(weights) == 0:
-            raise ValueError("Die Summe der Partikelgewichte ist null! Überprüfen Sie die Gewichtungslogik.")
-
-        # Effektive Partikelzahl
-        N_eff = 1.0 / np.sum(weights ** 2)
-
-        # Resampling nur durchführen, wenn N_eff klein ist
-        if N_eff < len(self.particles) / 2:
-            self.particles = self.systematic_resample()
+        # Resample particles
+        # self.__resample_particles()
+        self.__resampling()
 
     def __move_particles(self, d_linear: float, d_angular: float):
         """
@@ -842,7 +755,7 @@ class FastSLAM2:
         dx = landmark.x - particle.x
         dy = landmark.y - particle.y
         distance = math.sqrt(dx ** 2 + dy ** 2)
-        angle = (np.arctan2(dy, dx) - particle.yaw + np.pi) % (2 * np.pi) - np.pi # Ensure angle is between -pi and pi
+        angle = np.arctan2(dy, dx) - particle.yaw
         return np.array([distance, angle])
 
     @staticmethod
@@ -863,24 +776,98 @@ class FastSLAM2:
             [dy / q, -dx / q]
         ])
 
-    def systematic_resample(self):
-        num_particles = len(self.particles)
+    @staticmethod
+    def __gaussian_likelihood(predicted_measurement: ndarray, cov: ndarray, actual_measurement: ndarray):
+        """
+        Calculate the Gaussian likelihood of the actual measurement given the predicted measurement and covariance.
+        The likelihood is used to update the weight of the particle. It describes how likely the actual measurement fits the predicted measurement.
+        :param predicted_measurement: The predicted measurement (distance and angle from the particle to the landmark)
+        :param cov: Covariance matrix of the particle's landmark
+        :param actual_measurement: The actual measurement (measured distance and angle to the landmark)
+        :return: Returns the Gaussian likelihood of the actual measurement given the predicted measurement and covariance.
+        """
+        diff = actual_measurement - predicted_measurement
+        exponent = -0.5 * np.dot(diff.T, np.linalg.inv(cov)).dot(diff)
+        return math.exp(exponent) / math.sqrt((2 * math.pi) ** len(actual_measurement) * np.linalg.det(cov))
 
-        # Normalisierung der Gewichte
-        weights = np.array([particle.weight for particle in self.particles])
-        weights /= np.sum(weights)  # Normalisierung der Gewichte
+    def __resample_particles(self):
+        """
+        Resample the particles based on their weights. Particles with higher weights are more likely to be selected.
+        Particles with lower weights are more likely to be removed. This helps to focus on the most likely particles.
+        """
+        particle_len = len(self.particles)
+
+        # Normalize weights
+        weights = np.array([p.weight for p in self.particles])
+        normalized_weights = weights / np.sum(weights)
+
+        # Create cumulative sum array
+        cumulative_sum = np.cumsum(normalized_weights)
 
         # Resampling
-        positions = (np.arange(num_particles) + np.random.rand()) / num_particles
-        cumulative_sum = np.cumsum(weights)
+        resampled_particles = []
+        for _ in range(particle_len):
+            # Get random number between 0 and 1
+            r = random.random()
 
-        # Resampling mit Indices
-        indices = np.searchsorted(cumulative_sum, positions)
+            # Add particle to resampled particles based on the cumulative sum
+            for i in range(particle_len):
+                if r < cumulative_sum[i]:
+                    resampled_particles.append(self.particles[i])
+                    break
 
-        # Erstellen der neuen Partikel basierend auf den Indizes
-        resampled_particles = [self.particles[i] for i in indices]
+        # Each particle gets the same weight after resampling
+        for p in resampled_particles:
+            p.weight = 1.0 / particle_len
 
         return resampled_particles
+
+    def __resampling(self):
+        # Get normalized weights of particles
+        weights = np.array([p.weight for p in self.particles])
+
+        # Prevent division by zero
+        sum_weights = np.sum(weights)
+        if sum_weights == 0: # TODO
+            self.particles = [
+                Particle(
+                    random.uniform(-4.1, 5.8),  # random x value
+                    random.uniform(-4.5, 5.5),  # random y value
+                    random.uniform(0, 360),  # random yaw value
+                ) for _ in range(NUM_PARTICLES)
+            ]
+            return
+
+        normalized_weights = weights / sum_weights
+
+        # Copy best particle TODO: Check if this is better than mean position
+        # best_id = np.argsort(normalized_weights)[-1]
+        # estimated_R = copy.deepcopy(self.particles[best_id])
+
+        # Calculate effective particle number. This number describes how many particles are actually contributing to the estimate.
+        # A low number indicates that the particles are not well distributed and the resampling step is necessary.
+        N_eff = 1 / np.sum(normalized_weights ** 2)
+
+        # Resample the particles using low variance method if the effective particle number is below the half of the total number of particles
+        if N_eff < NUM_PARTICLES / 2:
+            print("Resample!")
+            new_particles: list[Particle] = [Particle(0, 0, 0)] * NUM_PARTICLES  # New particles with fixed length
+            inv_num_particles = 1 / NUM_PARTICLES   # Inverse of the number of particles
+            random_start_position = random.random() * inv_num_particles # Random start position
+            cumulative_sum = normalized_weights[0]   # Cumulative sum will be used to select the particles
+
+            # Copy particles based on the normalized weights and the random start position
+            i = 0
+            for j in range(NUM_PARTICLES):
+                pos_cumulative_weights = random_start_position + j * inv_num_particles # Calculate a random position of the cumulative weights
+                while pos_cumulative_weights > cumulative_sum:
+                    i += 1
+                    cumulative_sum += normalized_weights[i]
+                new_particles[j] = copy.deepcopy(self.particles[i])
+
+            # Update the particles and their weights
+            self.particles = new_particles
+
 
 # endregion
 
@@ -888,20 +875,16 @@ class FastSLAM2:
 # Number of particles
 NUM_PARTICLES = 50
 
-# Variances for the initial position and yaw of the particles
-INITIAL_POSITION_VAR = 0.8  # 0.5 'meters' standard deviation
-INITIAL_YAW_VAR = 0.1  # ca. 0.1 radian measure (~5-7 degrees) standard deviation
-
 # Distance threshold for associating landmarks to particles
-MAXIMUM_LANDMARK_DISTANCE = 2
+MAXIMUM_LANDMARK_DISTANCE = 3.5
 
 # Translation and rotation noise represent the standard deviation of the translation and rotation.
 # The noise is used to add uncertainty to the movement of the robot and particles. It depends on the accuracy of the robot's odometry sensors.
-TRANSLATION_NOISE = 0.001
-ROTATION_NOISE = 0.001
+TRANSLATION_NOISE = 0.01
+ROTATION_NOISE = 0.1
 
 # The measurement noise of the Kalman filter depends on the laser's accuracy
-MEASUREMENT_NOISE = np.array([[0.01, 0.0], [0.0, 0.01]])
+MEASUREMENT_NOISE = np.array([[0.1, 0.0], [0.0, 0.1]])
 # endregion
 
 # region FastSLAM 2.0 algorithm and objects in the environment
@@ -922,14 +905,14 @@ MIN_ITERATIONS_TO_UPDATE_ROBOT_POSITION = 1000000000
 iteration = 0
 while True:
     # Move the robot and get the linear and angular delta values
-    # delta_linear, delta_angular = robot.move()
-    delta_linear, delta_angular = 0, 0
+    delta_linear, delta_angular = robot.move()
+    # delta_linear, delta_angular = 0, 0
 
     # Get the points of scanned obstacles in the environment using the robot's laser data
     point_list = robot.scan_environment()
 
     # # TODO:Remove; Update the obstacles list with the scanned points so new borders and obstacles will be added to the map
-    obstacles = InterpretationService.update_obstacles(point_list)
+    # obstacles = InterpretationService.update_obstacles(point_list)
 
     # Search for landmarks in the scanned points using line filter and IEPF and get the measurements to them and their points
     measurement_list, landmark_points = LandmarkService.get_measurements_to_landmarks(point_list)
