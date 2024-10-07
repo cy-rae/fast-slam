@@ -718,8 +718,8 @@ class EvaluationService:
         # Calculate the angular deviation (absolute difference between yaw angles)
         angular_deviation = abs(actual_yaw - robot.yaw)
 
-        # Normalize the angular deviation to be within the range [0, 2pi] (radians)
-        angular_deviation = (angular_deviation + np.pi) % (2 * np.pi)
+        # Normalize the angular deviation to be within the range [-pi, pi] (radians)
+        angular_deviation = (angular_deviation + np.pi) % (2 * np.pi) - np.pi
 
         # Calculate the deviation percentage for the yaw angle
         return (abs(angular_deviation) / (2 * np.pi)) * 100  # Times 100 so 100% equals 2pi radians
@@ -933,23 +933,9 @@ while True:
     # Move the robot and get the linear and angular delta values
     delta_linear, delta_angular = robot.move()
 
-    # Get the points of scanned obstacles in the environment using the robot's laser data
-    point_list = robot.scan_environment()
-
-    # Search for landmarks in the scanned points using line filter and IEPF and get the measurements to them and their points
-    measurement_list, landmark_points = LandmarkService.get_measurements_to_landmarks(point_list)
-
-    # Update the landmark ID in the measurements if they are referencing to an existing landmark
-    measurement_list = LandmarkService.associate_landmarks(measurement_list, landmark_points)
-
-    # Iterate the FastSLAM 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
-    fast_slam.iterate(delta_linear, delta_angular, measurement_list)
-
-    # Update the robot's position based on the estimated position of the particles after a configured number of iterations
-    (robot.x, robot.y, robot.yaw) = InterpretationService.estimate_robot_position(fast_slam.particles)
-
-    # Plot the map with the robot, particles, landmarks and obstacles/borders
-    MapService.plot_map()
+    robot.yaw = (robot.yaw + delta_angular + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
+    robot.x += delta_linear * np.cos(robot.yaw)
+    robot.y += delta_linear * np.sin(robot.yaw)
 
     # Validate the robot's position based on the actual position
     EvaluationService.evaluate_estimation()

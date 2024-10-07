@@ -718,8 +718,8 @@ class EvaluationService:
         # Calculate the angular deviation (absolute difference between yaw angles)
         angular_deviation = abs(actual_yaw - robot.yaw)
 
-        # Normalize the angular deviation to be within the range [0, 2pi] (radians)
-        angular_deviation = (angular_deviation + np.pi) % (2 * np.pi)
+        # Normalize the angular deviation to be within the range [-pi, pi] (radians)
+        angular_deviation = (angular_deviation + np.pi) % (2 * np.pi) - np.pi
 
         # Calculate the deviation percentage for the yaw angle
         return (abs(angular_deviation) / (2 * np.pi)) * 100  # Times 100 so 100% equals 2pi radians
@@ -901,15 +901,15 @@ class FastSLAM2:
 
 # region PARAMETERS
 # Number of particles
-NUM_PARTICLES = 20
+NUM_PARTICLES = 30
 
 # Distance threshold for associating landmarks to particles
 MAXIMUM_LANDMARK_DISTANCE = 2
 
 # Translation and rotation noise represent the standard deviation of the translation and rotation.
 # The noise is used to add uncertainty to the movement of the robot and particles. It depends on the accuracy of the robot's odometry sensors.
-TRANSLATION_NOISE = 0.05
-ROTATION_NOISE = 0.005
+TRANSLATION_NOISE = 0.01
+ROTATION_NOISE = 0.001
 
 # The measurement noise of the Kalman filter depends on the laser's accuracy
 MEASUREMENT_NOISE = np.array([[0.01, 0.0], [0.0, 0.01]])
