@@ -24,10 +24,11 @@ class LandmarkService:
         # Calculate the intersection points and cluster them to prevent multiple points for the same intersection
         # which can happen when multiple lines were detected for the same edge
         intersection_points = LandmarkService.__calculate_intersections(lines, width, height)
-        intersection_points = LandmarkService.__cluster_points(intersection_points, 10, 1)
+        intersection_points = LandmarkService.__convert_back_to_original_space(scanned_points, intersection_points)
+        intersection_points = LandmarkService.__cluster_points(intersection_points, 0.5, 1)
 
         # Convert the intersection points back to the original coordinate space
-        return LandmarkService.__convert_back_to_original_space(scanned_points, intersection_points)
+        return intersection_points
 
     @staticmethod
     def __create_hough_transformation_image(scanned_points: np.ndarray):

@@ -10,14 +10,15 @@ class HoughTransformation:
     @staticmethod
     def detect_line_intersections(points: np.ndarray):
         """
-        Detect line intersections in
-        :return:
+        Detect line intersections in the given points using the hough transformation.
+        :param points: The points to detect line intersections in. The points are represented as a Nx2 array
+        :return: Returns the intersection points
         """
         # Create hough transformation image
         image, width, height = HoughTransformation.__create_hough_transformation_image(points)
 
         # Detect lines using hough transformation
-        lines = HoughTransformation.__hough_line_detection(image)
+        lines = HoughTransformation.__detect_lines(image)
 
         # Calculate the intersection points. If no intersection points are found, return empty lists
         intersection_points = HoughTransformation.__calculate_intersections(lines, width, height)
@@ -26,6 +27,8 @@ class HoughTransformation:
 
         # Convert the intersection points back to the original coordinate space
         intersection_points = HoughTransformation.__convert_back_to_original_space(points, intersection_points)
+
+        return intersection_points
 
     @staticmethod
     def __create_hough_transformation_image(scanned_points: np.ndarray):
@@ -61,7 +64,7 @@ class HoughTransformation:
 
 
     @staticmethod
-    def detect_lines(image):
+    def __detect_lines(image):
         """
         Detect lines in the given image using the hough transformation.
         :param image: The image to detect lines in
@@ -134,17 +137,17 @@ class HoughTransformation:
         original_points: list[tuple[float, float]] = []
 
         # Calculate the offset to move all points into the correct position of the coordinate system
-        min_x = int(np.min(scanned_points[:, 0] * LandmarkUtils.__scale_factor))
-        min_y = int(np.min(scanned_points[:, 1] * LandmarkUtils.__scale_factor))
+        min_x = int(np.min(scanned_points[:, 0] * HoughTransformation.__scale_factor))
+        min_y = int(np.min(scanned_points[:, 1] * HoughTransformation.__scale_factor))
         offset_x = -min_x if min_x < 0 else 0
         offset_y = -min_y if min_y < 0 else 0
-        offset_x += LandmarkUtils.__padding
-        offset_y += LandmarkUtils.__padding
+        offset_x += HoughTransformation.__padding
+        offset_y += HoughTransformation.__padding
 
         # Calculate the original points
         for x, y in cluster_centers:
-            original_x = (x - offset_x) / LandmarkUtils.__scale_factor
-            original_y = (y - offset_y) / LandmarkUtils.__scale_factor
+            original_x = (x - offset_x) / HoughTransformation.__scale_factor
+            original_y = (y - offset_y) / HoughTransformation.__scale_factor
             original_points.append((original_x, original_y))
 
         return original_points
