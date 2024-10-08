@@ -1,8 +1,8 @@
 """
-This script contains all the classes and methods that are needed to run the FastSLAM 2.0 algorithm.
+This script contains all the classes and methods that are needed to run the FastSLAM2 2.0 algorithm.
 You can upload this script to the JDE Robots platform and run it in the simulation environment.
 The script will create a map with the robot, particles, landmarks, and obstacles.
-The robot will move in the environment and update its position based on the observed landmarks and the FastSLAM 2.0 algorithm.
+The robot will move in the environment and update its position based on the observed landmarks and the FastSLAM2 2.0 algorithm.
 """
 import math
 import random
@@ -86,7 +86,7 @@ class Landmark(Point):
 
 class Particle(DirectedPoint):
     """
-    Class to represent a particle in the FastSLAM 2.0 algorithm.
+    Class to represent a particle in the FastSLAM2 2.0 algorithm.
     """
 
     def __init__(self, x: float, y: float, yaw: float):
@@ -94,16 +94,16 @@ class Particle(DirectedPoint):
         self.weight = 1.0 / NUM_PARTICLES
         self.landmarks: list[Landmark] = []
 
-    def get_index_of_landmark(self, landmark_id: uuid.UUID) -> int or None:
+    def get_landmark(self, landmark_id: uuid.UUID) -> int or None:
         """
-        Get the index of the landmark with the passed ID.
+        Get the landmark and its index with the passed ID.
         :param landmark_id: The ID of the landmark
-        :return: Returns the index of the landmark or None if the landmark is not found
+        :return: Returns the landmark  and its index or None if the landmark is not found
         """
         for i, landmark in enumerate(self.landmarks):
             if landmark.id == landmark_id:
-                return i
-        return None
+                return landmark, i
+        return None, None
 
 
 class Robot(DirectedPoint):
@@ -113,13 +113,7 @@ class Robot(DirectedPoint):
 
     def __init__(self, x=0.0, y=0.0, yaw=0.0):
         super().__init__(x, y, yaw)
-        self.x_prev = 0.0
-        self.y_prev = 0.0
-        self.yaw_prev = 0.0
-        self.timestamp_prev = 0.0
-        self.x_prev = 0.0
-        self.y_prev = 0.0
-        self.yaw_prev = 0.0
+        self.prev_points: list[ndarray] = [] # List of scanned points from the previous iteration
 
     @staticmethod
     def scan_environment() -> list[Point]:
@@ -149,9 +143,26 @@ class Robot(DirectedPoint):
             scanned_points.append(Point(x, y))
         return scanned_points
 
-    def move(self):
+    def move(self, scanned_points: list[ndarray]):
         """
         Move the robot based on the bumper state.
+        :return: Returns the linear and angular velocity of the robot
+        """
+        # Move robot in real world
+        self.__move_in_real_world()
+
+        # Get the translation and rotation using ICP.
+        target_points = self.scan_environment()
+        rotation, translation = self.__icp(scanned_points)
+
+        # Update list of previous scanned points for next iteration
+
+        # Second, calculate delta values for odometry simulation
+        return self.__simulate_odometry()
+
+    def __move_in_real_world(self):
+        """
+        Set the linear and angular velocity of the robot based on the bumper state.
         :return: Returns the linear and angular velocity of the robot
         """
         # First, move robot in real world
@@ -173,48 +184,71 @@ class Robot(DirectedPoint):
             v = 1
             w = 0
 
-        # Move robot
+        # Set the linear and angular velocity of the robot
         HAL.setV(v)
         HAL.setW(w)
 
-        # Second, calculate delta values for odometry simulation
-        return self.__simulate_odometry()
-
-    def __simulate_odometry(self) -> tuple[float, float]:
+    def __icp(self, target_points: ndarray, max_iterations=100, tolerance=1e-6):
         """
-        Simulate odometry data by calculating the difference in x and y coordinates and the difference in yaw angle (in radians) to the previous pose.
-        Since there is no odometry data, we have to calculate the delta values based on the current pose and the previous pose.
-        :return: Returns the difference in x and y coordinates and the difference in yaw angle (in radians) to the previous pose.
+        Iterative closest point algorithm for 2D point clouds to find the optimal rotation and translation between them.
+        :param target_points: Nx2 array of target points
+        :param max_iterations: Maximum number of iterations
+        :param tolerance: Tolerance for convergence
+        :return: Returns the rotation in radians and translation vector
         """
-        # Get current pose
-        x_curr = HAL.getPose3d().x
-        y_curr = HAL.getPose3d().y
-        yaw_curr = HAL.getPose3d().yaw  # in radians
+        # Initial transformation with identity matrix and zero vector
+        rotation_matrix = np.eye(2)
+        translation_vector = np.zeros((2,))
 
-        # Calculate linear and angular velocity
-        v = self.__calculate_linear_delta(x_curr, y_curr)
-        w = yaw_curr - self.yaw_prev
+        for _ in range(max_iterations):
+            # Apply the current transformation to source points
+            transformed_points = np.dot(source_points, rotation_matrix.T) + translation_vector
 
-        # Update previous values
-        self.x_prev = x_curr
-        self.y_prev = y_curr
-        self.yaw_prev = yaw_curr
+            # Find nearest neighbors in target point cloud
+            tree = KDTree(target_points)
+            _, indices = tree.query(transformed_points)
 
-        return v, w
+            # Corresponding points from target
+            matched_points = target_points[indices]
 
-    def __calculate_linear_delta(self, x_curr: float, y_curr: float):
-        """
-        Calculate the linear velocity of the robot based on the current and previous pose.
-        :param x_curr: Current x-coordinate
-        :param y_curr: Current y-coordinate
-        :return: Returns the linear velocity of the robot
-        """
-        # Calculate the change in x and y
-        delta_x = x_curr - self.x_prev
-        delta_y = y_curr - self.y_prev
-        delta_d = np.sqrt(delta_x ** 2 + delta_y ** 2)
+            # Compute centroids of both point sets
+            source_centroid = np.mean(source_points, axis=0)
+            target_centroid = np.mean(matched_points, axis=0)
 
-        return delta_d
+            # Center the points around the centroids
+            source_centered = source_points - source_centroid
+            target_centered = matched_points - target_centroid
+
+            # Compute covariance matrix
+            cov = np.dot(source_centered.T, target_centered)
+
+            # Singular Value Decomposition (SVD)
+            U, _, Vt = np.linalg.svd(cov)
+
+            # Compute optimal rotation
+            new_rotation_matrix = np.dot(U, Vt)
+
+            # Ensure it's a proper rotation (det(rotation_matrix) = 1)
+            if np.linalg.det(new_rotation_matrix) < 0:
+                Vt[1, :] *= -1
+                new_rotation_matrix = np.dot(U, Vt)
+
+            # Compute optimal translation
+            new_translation_vector = target_centroid - np.dot(source_centroid, new_rotation_matrix.T)
+
+            # Check for convergence
+            if np.linalg.norm(new_rotation_matrix - rotation_matrix) < tolerance and np.linalg.norm(
+                    new_translation_vector - translation_vector) < tolerance:
+                break
+
+            # Update transformation
+            rotation_matrix = new_rotation_matrix
+            translation_vector = new_translation_vector
+
+        # Covert the rotation matrix to an angle in radians
+        rotation = np.arctan2(R[1, 0], R[0, 0])
+
+        return rotation, translation_vector
 
 
 # endregion
@@ -512,7 +546,7 @@ class LandmarkService:
 
 class InterpretationService:
     """
-    Service class to interpret the results of the FastSLAM 2.0 algorithm.
+    Service class to interpret the results of the FastSLAM2 2.0 algorithm.
     """
 
     @staticmethod
@@ -594,7 +628,7 @@ class MapService:
             MapService.__plot_as_dots(draw, landmarks, 'green')  # Mark landmarks as green dots
 
             # Save the plot as an image file
-            image.save('/usr/share/nginx/html/images/map.jpg', 'JPEG')
+            image.save('/usr/shared/nginx/html/images/map.jpg', 'JPEG')
         except Exception as e:
             print(e)
 
@@ -618,7 +652,7 @@ class MapService:
         font = ImageFont.load_default()
         draw.text((width - 100, center_y + 10), "X-axis", fill="black", font=font)
         draw.text((center_x + 10, 10), "Y-axis", fill="black", font=font)
-        draw.text((width // 4, 10), "Map created by the FastSLAM 2.0 algorithm", fill="black", font=font)
+        draw.text((width // 4, 10), "Map created by the FastSLAM2 2.0 algorithm", fill="black", font=font)
 
         return image, draw
 
@@ -727,15 +761,15 @@ class EvaluationService:
 
 # endregion
 
-# region FastSLAM 2.0
+# region FastSLAM2 2.0
 class FastSLAM2:
     """
-    Class that realizes the FastSLAM 2.0 algorithm.
+    Class that realizes the FastSLAM2 2.0 algorithm.
     """
 
     def __init__(self):
         """
-        Initialize the FastSLAM 2.0 algorithm with the specified number of particles.
+        Initialize the FastSLAM2 2.0 algorithm with the specified number of particles.
         """
         # Initialize particles with the start position of the robot
         self.particles: list[Particle] = [
@@ -748,7 +782,7 @@ class FastSLAM2:
 
     def iterate(self, d_linear: float, d_angular: float, measurements: list[Measurement]):
         """
-        Perform one iteration of the FastSLAM 2.0 algorithm using the passed linear and angular delta values and the measurements.
+        Perform one iteration of the FastSLAM2 2.0 algorithm using the passed linear and angular delta values and the measurements.
         :param d_linear: linear delta value
         :param d_angular: angular delta value
         :param measurements: list of measurements to observed landmarks (distances and angles of landmark to robot and landmark ID)
@@ -761,20 +795,17 @@ class FastSLAM2:
             for particle in self.particles:
 
                 # Search for the associated landmark by the landmark ID of the measurement
-                associated_landmark_index = particle.get_index_of_landmark(measurement.landmark_id)
+                associated_landmark, associated_landmark_index = particle.get_landmark(measurement.landmark_id)
 
                 # If no associated landmark is found, the measurement is referencing to a new landmark
                 # and the new landmark will be added to the particle map
-                if associated_landmark_index is None:
+                if associated_landmark is None or associated_landmark_index is None:
                     landmark_x = particle.x + measurement.distance * math.cos(particle.yaw + measurement.yaw)
                     landmark_y = particle.y + measurement.distance * math.sin(particle.yaw + measurement.yaw)
                     particle.landmarks.append(Landmark(measurement.landmark_id, landmark_x, landmark_y))
 
                 # If an associated landmark is found, the particle's map will be updated based on the actual measurement
                 else:
-                    # Get the associated landmark
-                    associated_landmark = particle.landmarks[associated_landmark_index]
-
                     # Calculate the predicted measurement of the particle and the associated landmark
                     dx = associated_landmark.x - particle.x
                     dy = associated_landmark.y - particle.y
@@ -915,10 +946,10 @@ ROTATION_NOISE = 0.001
 MEASUREMENT_NOISE = np.array([[0.01, 0.0], [0.0, 0.01]])
 # endregion
 
-# region FastSLAM 2.0 algorithm and objects in the environment
+# region FastSLAM2 2.0 algorithm and objects in the environment
 fast_slam = FastSLAM2()
 
-# The robot that scans the environment and moves in the environment. It's position will be updated based on the particles of the FastSLAM 2.0 algorithm
+# The robot that scans the environment and moves in the environment. It's position will be updated based on the particles of the FastSLAM2 2.0 algorithm
 robot = Robot()
 
 # List of obstacles in the environment which will be plotted in the map. Only visualization purpose.
@@ -942,7 +973,7 @@ while True:
     # Update the landmark ID in the measurements if they are referencing to an existing landmark
     measurement_list = LandmarkService.associate_landmarks(measurement_list, landmark_points)
 
-    # Iterate the FastSLAM 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
+    # Iterate the FastSLAM2 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
     fast_slam.iterate(delta_linear, delta_angular, measurement_list)
 
     # Update the robot's position based on the estimated position of the particles after a configured number of iterations

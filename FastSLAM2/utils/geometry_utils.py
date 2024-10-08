@@ -1,23 +1,7 @@
 ﻿import numpy as np
 from numpy import ndarray
 
-
-class Point:
-    """
-    Class to represent a point in 2D space.
-    """
-
-    def __init__(self, x: float, y: float):
-        self.x = x
-        self.y = y
-
-    def pose(self):
-        """
-        Get the pose/mean of the point as a numpy array [x, y]
-        :return:
-        """
-        return np.array([self.x, self.y])
-
+class GeometryUtils:
     @staticmethod
     def mahalanobis_distance(position_a: ndarray, position_b: ndarray, covariance_matrix: ndarray) -> float:
         """

@@ -1,4 +1,6 @@
-﻿import numpy as np
+﻿import uuid
+
+import numpy as np
 
 
 class Measurement:
@@ -7,6 +9,7 @@ class Measurement:
     """
 
     def __init__(self, distance: float, yaw: float):
+        self.landmark_id: uuid.UUID = uuid.uuid4()
         self.distance = distance
         self.yaw = yaw
 

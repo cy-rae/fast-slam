@@ -5,20 +5,11 @@ FROM jderobot/robotics-backend:latest
 ENV http_proxy=http://rb-proxy-de.bosch.com:8080
 ENV https_proxy=http://rb-proxy-de.bosch.com:8080
 
-# Install NGINX and other dependencies
-RUN apt-get update && apt-get install -y nginx && pip install scikit-learn
+# Install dependencies
+RUN apt-get update && pip install scikit-learn
 
-# Copy the custom Nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
-
-# Erstelle ein Verzeichnis für statische Dateien
-RUN mkdir -p /usr/share/nginx/html/images
-
-# Kopiere das Originalbild und die HTML-Datei in das Verzeichnis von NGINX
-COPY index.html /usr/share/nginx/html/index.html
-
-# Expose default Nginx server port 80
-EXPOSE 80
-
-# Start Nginx server
-CMD ["nginx", "-g", "daemon off;"]
+# Copy the FastSLAM2 module into the container
+WORKDIR /workspace/code
+COPY setup.py .
+COPY FastSLAM2/ FastSLAM2/
+RUN pip install .

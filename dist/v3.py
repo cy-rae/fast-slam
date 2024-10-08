@@ -1,8 +1,8 @@
 ﻿"""
-This script contains all the classes and methods that are needed to run the FastSLAM 2.0 algorithm.
+This script contains all the classes and methods that are needed to run the FastSLAM2 2.0 algorithm.
 You can upload this script to the JDE Robots platform and run it in the simulation environment.
 The script will create a map with the robot, particles, landmarks, and obstacles.
-The robot will move in the environment and update its position based on the observed landmarks and the FastSLAM 2.0 algorithm.
+The robot will move in the environment and update its position based on the observed landmarks and the FastSLAM2 2.0 algorithm.
 """
 import math
 import random
@@ -89,7 +89,7 @@ class Landmark(Point):
 
 class Particle(DirectedPoint):
     """
-    Class to represent a particle in the FastSLAM 2.0 algorithm.
+    Class to represent a particle in the FastSLAM2 2.0 algorithm.
     """
 
     def __init__(self, x: float, y: float, yaw: float):
@@ -228,7 +228,7 @@ class MapService:
             MapService.__plot_as_dots(draw, landmarks, 'green')  # Mark landmarks as green dots
 
             # Save the plot as an image file
-            image.save('/usr/share/nginx/html/images/map.jpg', 'JPEG')
+            image.save('/usr/shared/nginx/html/images/map.jpg', 'JPEG')
         except Exception as e:
             print(e)
 
@@ -252,7 +252,7 @@ class MapService:
         font = ImageFont.load_default()
         draw.text((width - 100, center_y + 10), "X-axis", fill="black", font=font)
         draw.text((center_x + 10, 10), "Y-axis", fill="black", font=font)
-        draw.text((width // 4, 10), "Map created by the FastSLAM 2.0 algorithm", fill="black", font=font)
+        draw.text((width // 4, 10), "Map created by the FastSLAM2 2.0 algorithm", fill="black", font=font)
 
         return image, draw
 
@@ -297,7 +297,7 @@ class MapService:
 
 class InterpretationService:
     """
-    Service class to interpret the results of the FastSLAM 2.0 algorithm.
+    Service class to interpret the results of the FastSLAM2 2.0 algorithm.
     """
 
     @staticmethod
@@ -384,15 +384,15 @@ class InterpretationService:
 
 # endregion
 
-# region FastSLAM 2.0
+# region FastSLAM2 2.0
 class FastSLAM2:
     """
-    Class that realizes the FastSLAM 2.0 algorithm.
+    Class that realizes the FastSLAM2 2.0 algorithm.
     """
 
     def __init__(self):
         """
-        Initialize the FastSLAM 2.0 algorithm with the specified number of particles.
+        Initialize the FastSLAM2 2.0 algorithm with the specified number of particles.
         """
         # self.particles: list[Particle] = [
         #     Particle(
@@ -414,7 +414,7 @@ class FastSLAM2:
 
     def iterate(self, v: float, w: float, measurements: list[Measurement]):
         """
-        Perform one iteration of the FastSLAM 2.0 algorithm using the passed linear and angular velocities and observations.
+        Perform one iteration of the FastSLAM2 2.0 algorithm using the passed linear and angular velocities and observations.
         :param v: linear velocity
         :param w: angular velocity
         :param measurements: list of measurements to observed landmarks (distances and angles of landmark to robot)
@@ -692,10 +692,10 @@ ROTATION_NOISE = 0.1
 MEASUREMENT_NOISE = np.array([[0.01, 0.0], [0.0, 0.01]])
 # endregion
 
-# region FastSLAM 2.0 algorithm and objects in the environment
+# region FastSLAM2 2.0 algorithm and objects in the environment
 fast_slam = FastSLAM2()
 
-# The robot that scans the environment and moves in the environment. It's position will be updated based on the particles of the FastSLAM 2.0 algorithm
+# The robot that scans the environment and moves in the environment. It's position will be updated based on the particles of the FastSLAM2 2.0 algorithm
 robot = Robot()
 
 # List of obstacles in the environment which will be plotted in the map. Only visualization purpose.
@@ -752,7 +752,7 @@ while True:
        # # Get the observations of the scanned landmarks
        # measurement_list = get_measurements_to_landmarks(point_list)
        #
-       # # Iterate the FastSLAM 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
+       # # Iterate the FastSLAM2 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
        # fast_slam.iterate(v_i, w_i, measurement_list)
        #
        # # Update the robot's position based on the estimated position of the particles after a configured number of iterations
