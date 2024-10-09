@@ -1,11 +1,11 @@
 from numpy import ndarray
 
-from FastSLAM2.algorithms.fast_slam_2 import FastSLAM2
-from FastSLAM2.models.measurement import Measurement
-from FastSLAM2.models.robot import Robot
-from FastSLAM2.utils.evaluation_utils import EvaluationUtils
-from FastSLAM2.utils.landmark_utils import LandmarkUtils
-from FastSLAM2.utils.serializer import Serializer
+from FastSLAM2 import FastSLAM2
+from FastSLAM2 import Measurement
+from FastSLAM2 import Robot
+from FastSLAM2 import EvaluationUtils
+from FastSLAM2 import LandmarkUtils
+from FastSLAM2 import Serializer
 
 # Initialize the robot, FastSLAM 2.0 algorithm and landmark list
 robot = Robot()
