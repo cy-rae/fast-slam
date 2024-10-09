@@ -20,7 +20,8 @@ class MapUtils:
         :param landmarks: The landmarks represented as a list of tuples (x, y)
         """
         try:
-            fig, ax = MapUtils.__init_plot()
+            ax = MapUtils.__init_plot()
+
             MapUtils.__plot_as_arrows(ax, directed_points=[robot], scale=10,
                                       color='red')  # Plot the robot as a red arrow
             MapUtils.__plot_as_arrows(ax, directed_points=particles, scale=7,
@@ -28,7 +29,7 @@ class MapUtils:
             MapUtils.__plot_as_dots(ax, landmarks, 'green')  # Mark landmarks as green dots
 
             # Show the plot
-            plt.show(fig)
+            plt.show()
         except Exception as e:
             print(e)
 
@@ -51,7 +52,7 @@ class MapUtils:
         ax.text(760, 10, "Y-axis", fontsize=12, color='black')
         ax.text(0, 10, "Map created by the fast_slam_2 2.0 algorithm", fontsize=12, color='black')
 
-        return fig, ax
+        return ax
 
     @staticmethod
     def __plot_as_arrows(ax, directed_points: list[tuple[float, float, float]], scale: float, color: str):
