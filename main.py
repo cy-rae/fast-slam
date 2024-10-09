@@ -25,4 +25,4 @@ if __name__ == "__main__":
             MapUtils.plot_map(robot, particles, landmarks)
 
         # Wait for a second before updating the map
-        time.sleep(1)
+        time.sleep(0.5)
