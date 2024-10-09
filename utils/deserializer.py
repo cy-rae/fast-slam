@@ -1,4 +1,5 @@
-﻿import os
+﻿import json
+import os
 
 
 class Deserializer:
@@ -23,7 +24,7 @@ class Deserializer:
 
         # Read the JSON data from the file
         with open(file_path, 'r') as file:
-            json_data: str = file.read()
+            json_data: dict = json.load(file)
 
             robot: tuple[float, float, float] = Deserializer.__deserialize_directed_point(json_data['robot'])
             particles: list[tuple[float, float, float]] = Deserializer.__deserialize_directed_points(
@@ -33,7 +34,7 @@ class Deserializer:
         return robot, particles, landmarks
 
     @staticmethod
-    def __deserialize_directed_point(data: str) -> tuple[float, float, float]:
+    def __deserialize_directed_point(data: dict) -> tuple[float, float, float]:
         """
         Deserialize a directed point from the passed data
         :param data: This data contains the properties of the directed point
@@ -46,7 +47,7 @@ class Deserializer:
         return x, y, yaw
 
     @staticmethod
-    def __deserialize_directed_points(json_list: str) -> list[tuple[float, float, float]]:
+    def __deserialize_directed_points(json_list: dict) -> list[tuple[float, float, float]]:
         """
         Deserialize the JSON data into a list of directed point
         :param json_list: The JSON list
@@ -60,7 +61,7 @@ class Deserializer:
         return directed_points
 
     @staticmethod
-    def __deserialize_point(data: str) -> tuple[float, float]:
+    def __deserialize_point(data: dict) -> tuple[float, float]:
         """
         Deserialize a point from the passed data
         :param data: This data contains the properties of the point
@@ -72,7 +73,7 @@ class Deserializer:
         return x, y
 
     @staticmethod
-    def __deserialize_points(json_list: str) -> list[tuple[float, float]]:
+    def __deserialize_points(json_list: dict) -> list[tuple[float, float]]:
         """
         Deserialize the JSON data into a list of points
         :param json_list: The JSON list
