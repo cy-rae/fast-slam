@@ -3,7 +3,7 @@
 import numpy as np
 from numpy import ndarray
 
-from FastSLAM2.models.point import Point
+from fast_slam_2.models.point import Point
 
 
 class Landmark(Point):

@@ -3,12 +3,12 @@
 import numpy as np
 from numpy import ndarray
 
-from FastSLAM2.algorithms.hough_transformation import HoughTransformation
-from FastSLAM2.algorithms.line_filter import LineFilter
-from FastSLAM2.config import MAXIMUM_LANDMARK_DISTANCE
-from FastSLAM2.models.landmark import Landmark
-from FastSLAM2.models.measurement import Measurement
-from FastSLAM2.utils.geometry_utils import GeometryUtils
+from fast_slam_2.algorithms.hough_transformation import HoughTransformation
+from fast_slam_2.algorithms.line_filter import LineFilter
+from fast_slam_2.config import MAXIMUM_LANDMARK_DISTANCE
+from fast_slam_2.models.landmark import Landmark
+from fast_slam_2.models.measurement import Measurement
+from fast_slam_2.utils.geometry_utils import GeometryUtils
 
 
 class LandmarkUtils:

@@ -5,20 +5,20 @@ import numpy as np
 from numpy import ndarray
 from scipy.stats import multivariate_normal
 
-from FastSLAM2.config import NUM_PARTICLES, TRANSLATION_NOISE, ROTATION_NOISE, MEASUREMENT_NOISE
-from FastSLAM2.models.landmark import Landmark
-from FastSLAM2.models.measurement import Measurement
-from FastSLAM2.models.particle import Particle
+from fast_slam_2.config import NUM_PARTICLES, TRANSLATION_NOISE, ROTATION_NOISE, MEASUREMENT_NOISE
+from fast_slam_2.models.landmark import Landmark
+from fast_slam_2.models.measurement import Measurement
+from fast_slam_2.models.particle import Particle
 
 
 class FastSLAM2:
     """
-    Class that realizes the FastSLAM2 2.0 algorithm.
+    Class that realizes the fast_slam_2 2.0 algorithm.
     """
 
     def __init__(self):
         """
-        Initialize the FastSLAM2 2.0 algorithm with the specified number of particles.
+        Initialize the fast_slam_2 2.0 algorithm with the specified number of particles.
         """
         # Initialize particles with the start position of the robot
         self.particles: list[Particle] = [
@@ -31,7 +31,7 @@ class FastSLAM2:
 
     def iterate(self, translation_vector: ndarray, rotation: float, measurements: list[Measurement]):
         """
-        Perform one iteration of the FastSLAM2 2.0 algorithm using the passed translation, rotation, and measurements.
+        Perform one iteration of the fast_slam_2 2.0 algorithm using the passed translation, rotation, and measurements.
         :param translation_vector: The translation vector of the robot
         :param rotation: The rotation angle of the robot in radians
         :param measurements: List of measurements to observed landmarks (distances and angles of landmark to robot and landmark ID)

@@ -8,10 +8,10 @@ ENV https_proxy=http://rb-proxy-de.bosch.com:8080
 # Install dependencies
 RUN apt-get update && pip install scikit-learn
 
-# Copy the FastSLAM2 module into the container
+# Copy the fast_slam_2 module into the container
 WORKDIR /workspace/code
 COPY setup.py .
-COPY FastSLAM2/ FastSLAM2/
+COPY fast_slam_2/ fast_slam_2/
 RUN pip install .
 
 WORKDIR /

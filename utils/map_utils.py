@@ -1,8 +1,8 @@
 ﻿import numpy as np
 import matplotlib.pyplot as plt
 
-from FastSLAM2.models.directed_point import DirectedPoint
-from FastSLAM2.models.point import Point
+from fast_slam_2.models.directed_point import DirectedPoint
+from fast_slam_2.models.point import Point
 
 
 class MapUtils:
@@ -43,7 +43,7 @@ class MapUtils:
         # Axis labels
         ax.text(1400, 760, "X-axis", fontsize=12, color='black')
         ax.text(760, 10, "Y-axis", fontsize=12, color='black')
-        ax.text(0, 10, "Map created by the FastSLAM2 2.0 algorithm", fontsize=12, color='black')
+        ax.text(0, 10, "Map created by the fast_slam_2 2.0 algorithm", fontsize=12, color='black')
 
         return fig, ax
 

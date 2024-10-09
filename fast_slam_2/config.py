@@ -1,5 +1,5 @@
 ﻿"""
-This file contains the configuration parameters for the FastSLAM2 2.0 algorithm.
+This file contains the configuration parameters for the fast_slam_2 2.0 algorithm.
 """
 import numpy as np
 

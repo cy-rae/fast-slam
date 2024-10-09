@@ -1,4 +1,4 @@
-﻿from FastSLAM2.models.point import Point
+﻿from fast_slam_2.models.point import Point
 
 
 class DirectedPoint(Point):

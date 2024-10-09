@@ -1,7 +1,7 @@
 ﻿import os
 
-from FastSLAM2.models.directed_point import DirectedPoint
-from FastSLAM2.models.point import Point
+from fast_slam_2.models.directed_point import DirectedPoint
+from fast_slam_2.models.point import Point
 
 
 class Deserializer:

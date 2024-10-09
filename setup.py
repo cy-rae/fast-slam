@@ -1,7 +1,7 @@
 ﻿from setuptools import setup, find_packages
 
 setup(
-    name='FastSLAM2',
+    name='fast_slam_2',
     version='0.1',
     packages=find_packages(),
     description='This module contains all packages for the FastSLAM 2.0 algorithm.',

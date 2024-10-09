@@ -4,8 +4,8 @@ import HAL
 import numpy as np
 from numpy import ndarray
 
-from FastSLAM2.algorithms.icp import ICP
-from FastSLAM2.models.directed_point import DirectedPoint
+from fast_slam_2.algorithms.icp import ICP
+from fast_slam_2.models.directed_point import DirectedPoint
 
 
 class Robot(DirectedPoint):

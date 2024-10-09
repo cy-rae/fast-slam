@@ -1,5 +1,5 @@
 ﻿"""
-This file provides the classes for the FastSLAM2 2.0 algorithm.
+This file provides the classes for the fast_slam_2 2.0 algorithm.
 """
 # Provide models
 from .models.point import Point

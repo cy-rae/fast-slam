@@ -1,9 +1,9 @@
 ﻿import json
 import os
 
-from FastSLAM2.models.landmark import Landmark
-from FastSLAM2.models.particle import Particle
-from FastSLAM2.models.robot import Robot
+from fast_slam_2.models.landmark import Landmark
+from fast_slam_2.models.particle import Particle
+from fast_slam_2.models.robot import Robot
 
 
 class Serializer:

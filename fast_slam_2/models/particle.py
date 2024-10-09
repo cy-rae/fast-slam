@@ -1,13 +1,13 @@
 ﻿import uuid
 
-from FastSLAM2.config import NUM_PARTICLES
-from FastSLAM2.models.directed_point import DirectedPoint
-from FastSLAM2.models.landmark import Landmark
+from fast_slam_2.config import NUM_PARTICLES
+from fast_slam_2.models.directed_point import DirectedPoint
+from fast_slam_2.models.landmark import Landmark
 
 
 class Particle(DirectedPoint):
     """
-    Class to represent a particle in the FastSLAM2 2.0 algorithm.
+    Class to represent a particle in the fast_slam_2 2.0 algorithm.
     """
 
     def __init__(self, x: float, y: float, yaw: float):
