@@ -1,8 +1,5 @@
 ﻿import os
 
-from fast_slam_2.models.directed_point import DirectedPoint
-from fast_slam_2.models.point import Point
-
 
 class Deserializer:
     """
@@ -10,10 +7,14 @@ class Deserializer:
     """
 
     @staticmethod
-    def deserialize(file_path: str) -> tuple[DirectedPoint or None, list[DirectedPoint], list[Point]]:
+    def deserialize(file_path: str) -> tuple[
+        tuple[float, float, float] or None,
+        list[tuple[float, float, float]],
+        list[tuple[float, float]]
+    ]:
         """
         Deserialize the JSON data into classes.
-        :return: Returns the robot, landmarks, and particles
+        :return: Returns the robot, landmarks, and particles as tuples and lists
         """
         # Check if file exists
         if not file_path or not os.path.exists(file_path):
@@ -24,36 +25,62 @@ class Deserializer:
         with open(file_path, 'r') as file:
             json_data: str = file.read()
 
-            robot: DirectedPoint = DirectedPoint.from_dict(json_data["robot"])
-            particles: list[DirectedPoint] = Deserializer.__get_particles(json_data)
-            landmarks: list[Point] = Deserializer.__get_landmarks(json_data)
+            robot: tuple[float, float, float] = Deserializer.__deserialize_directed_point(json_data['robot'])
+            particles: list[tuple[float, float, float]] = Deserializer.__deserialize_directed_points(
+                json_data['particles'])
+            landmarks: list[tuple[float, float]] = Deserializer.__deserialize_points(json_data['landmarks'])
 
         return robot, particles, landmarks
 
     @staticmethod
-    def __get_particles(json_data: str) -> list[DirectedPoint]:
+    def __deserialize_directed_point(data: str) -> tuple[float, float, float]:
         """
-        Deserialize the JSON data into a list of directed point
-        :param json_data: The JSON data
-        :return: Returns the list of directed points which represent the particles
+        Deserialize a directed point from the passed data
+        :param data: This data contains the properties of the directed point
+        :return: Returns the x, y, and yaw values of the directed point
         """
-        particles: list[DirectedPoint] = []
-        for data in json_data["particles"]:
-            particle = DirectedPoint.from_dict(data)
-            particles.append(particle)
+        x = float(data['x'])
+        y = float(data['y'])
+        yaw = float(data['yaw'])
 
-        return particles
+        return x, y, yaw
 
     @staticmethod
-    def __get_landmarks(json_data: str) -> list[Point]:
+    def __deserialize_directed_points(json_list: str) -> list[tuple[float, float, float]]:
+        """
+        Deserialize the JSON data into a list of directed point
+        :param json_list: The JSON list
+        :return: Returns the list of directed points represented as a tuple (x, y, yaw)
+        """
+        directed_points: list[tuple[float, float, float]] = []
+        for data in json_list:
+            directed_point: tuple[float, float, float] = Deserializer.__deserialize_directed_point(data)
+            directed_points.append(directed_point)
+
+        return directed_points
+
+    @staticmethod
+    def __deserialize_point(data: str) -> tuple[float, float]:
+        """
+        Deserialize a point from the passed data
+        :param data: This data contains the properties of the point
+        :return: Returns the x and y values of the point
+        """
+        x = float(data['x'])
+        y = float(data['y'])
+
+        return x, y
+
+    @staticmethod
+    def __deserialize_points(json_list: str) -> list[tuple[float, float]]:
         """
         Deserialize the JSON data into a list of points
-        :param json_data: The JSON data
-        :return: Returns the list of points which represent the landmarks
+        :param json_list: The JSON list
+        :return: Returns the list of directed points represented as a tuple (x, y, yaw)
         """
-        landmarks: list[Point] = []
-        for data in json_data["landmarks"]:
-            landmark = Point.from_dict(data)
-            landmarks.append(landmark)
+        points: list[tuple[float, float]] = []
+        for data in json_list:
+            point: tuple[float, float] = Deserializer.__deserialize_point(data)
+            points.append(point)
 
-        return landmarks
+        return points

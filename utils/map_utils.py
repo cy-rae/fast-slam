@@ -1,8 +1,5 @@
-﻿import numpy as np
-import matplotlib.pyplot as plt
-
-from fast_slam_2.models.directed_point import DirectedPoint
-from fast_slam_2.models.point import Point
+﻿import matplotlib.pyplot as plt
+import numpy as np
 
 
 class MapUtils:
@@ -11,14 +8,23 @@ class MapUtils:
     """
 
     @staticmethod
-    def plot_map(robot: DirectedPoint, particles: list[DirectedPoint], landmarks: list[Point]):
+    def plot_map(
+            robot: tuple[float, float, float],
+            particles: list[tuple[float, float, float]],
+            landmarks: list[tuple[float, float]]
+    ):
         """
         Plot the map with the robot, particles, landmarks and obstacles/borders.
+        :param robot: The robot represented as a tuple (x, y, yaw)
+        :param particles: The particles represented as a list of tuples (x, y, yaw)
+        :param landmarks: The landmarks represented as a list of tuples (x, y)
         """
         try:
             fig, ax = MapUtils.__init_plot()
-            MapUtils.__plot_as_arrows(ax, directed_points=[robot], scale=10, color='red')  # Plot the robot as a red arrow
-            MapUtils.__plot_as_arrows(ax, directed_points=particles, scale=7, color='blue')  # Plot the particles as blue arrows
+            MapUtils.__plot_as_arrows(ax, directed_points=[robot], scale=10,
+                                      color='red')  # Plot the robot as a red arrow
+            MapUtils.__plot_as_arrows(ax, directed_points=particles, scale=7,
+                                      color='blue')  # Plot the particles as blue arrows
             MapUtils.__plot_as_dots(ax, landmarks, 'green')  # Mark landmarks as green dots
 
             # Show the plot
@@ -48,7 +54,7 @@ class MapUtils:
         return fig, ax
 
     @staticmethod
-    def __plot_as_arrows(ax, directed_points: list[DirectedPoint], scale: float, color: str):
+    def __plot_as_arrows(ax, directed_points: list[tuple[float, float, float]], scale: float, color: str):
         """
         Plot the passed directed points as arrows with the passed scale and color.
         :param directed_points: This list contains all the directed points which will be represented as arrows
@@ -57,26 +63,26 @@ class MapUtils:
         """
         center_x = 750  # Middle of the X-axis
         center_y = 750  # Middle of the Y-axis
-        for obj in directed_points:
+        for directed_point in directed_points:
             # Calculate the start and end point of the arrow
-            x_start = center_x + obj.x * 50  # Scale the X-coordinate
-            y_start = center_y - obj.y * 50  # Scale the Y-coordinate
-            x_end = x_start + np.cos(obj.yaw) * scale
-            y_end = y_start - np.sin(obj.yaw) * scale
+            x_start = center_x + directed_point[0] * 50  # Scale the X-coordinate
+            y_start = center_y - directed_point[1] * 50  # Scale the Y-coordinate
+            x_end = x_start + np.cos(directed_point[2]) * scale
+            y_end = y_start - np.sin(directed_point[2]) * scale
 
             # Draw the arrow
             ax.arrow(x_start, y_start, x_end - x_start, y_end - y_start,
                      head_width=5, head_length=10, fc=color, ec=color)
 
     @staticmethod
-    def __plot_as_dots(ax, points: list[Point], color: str):
+    def __plot_as_dots(ax, points: list[tuple[float, float]], color: str):
         """
         Plot the passed points as dots. The color of the dots is determined by the passed color parameter.
         :param points: This list contains all the points which will be represented as dots in the map
         :param color: The color of the dot ('k' -> black, 'g' -> green)
         """
         for point in points:
-            x = 750 + point.x * 50  # Scale the X-coordinate
-            y = 750 - point.y * 50  # Scale the Y-coordinate
+            x = 750 + point[0] * 50  # Scale the X-coordinate
+            y = 750 - point[1] * 50  # Scale the Y-coordinate
             radius = 5  # Size of the dots
             ax.plot(x, y, 'o', color=color, markersize=radius)
