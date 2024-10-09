@@ -6,8 +6,7 @@ ENV http_proxy=http://rb-proxy-de.bosch.com:8080
 ENV https_proxy=http://rb-proxy-de.bosch.com:8080
 
 # Install dependencies
-#RUN apt-get update && pip install scikit-learn && pip install open3d
-RUN apt-get update
+#RUN apt-get update
 
 # Copy the fast_slam_2 module into the container
 WORKDIR /workspace/code
