@@ -1,9 +1,7 @@
 ﻿import os
 
 from FastSLAM2.models.directed_point import DirectedPoint
-from FastSLAM2.models.landmark import Landmark
 from FastSLAM2.models.point import Point
-from FastSLAM2.models.robot import Robot
 
 
 class Deserializer:
@@ -26,9 +24,9 @@ class Deserializer:
         with open(file_path, 'r') as file:
             json_data: str = file.read()
 
-            robot = Robot.from_dict(json_data["robot"])
-            particles = Deserializer.__get_particles(json_data)
-            landmarks = Deserializer.__get_landmarks(json_data)
+            robot: DirectedPoint = DirectedPoint.from_dict(json_data["robot"])
+            particles: list[DirectedPoint] = Deserializer.__get_particles(json_data)
+            landmarks: list[Point] = Deserializer.__get_landmarks(json_data)
 
         return robot, particles, landmarks
 
@@ -39,7 +37,7 @@ class Deserializer:
         :param json_data: The JSON data
         :return: Returns the list of directed points which represent the particles
         """
-        particles = []
+        particles: list[DirectedPoint] = []
         for data in json_data["particles"]:
             particle = DirectedPoint.from_dict(data)
             particles.append(particle)
@@ -47,13 +45,13 @@ class Deserializer:
         return particles
 
     @staticmethod
-    def __get_landmarks(json_data: str) -> list[Landmark]:
+    def __get_landmarks(json_data: str) -> list[Point]:
         """
         Deserialize the JSON data into a list of points
         :param json_data: The JSON data
         :return: Returns the list of points which represent the landmarks
         """
-        landmarks = []
+        landmarks: list[Point] = []
         for data in json_data["landmarks"]:
             landmark = Point.from_dict(data)
             landmarks.append(landmark)
