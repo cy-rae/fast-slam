@@ -55,7 +55,8 @@ class LandmarkUtils:
         filtered_points: ndarray = LineFilter.filter(scanned_points)
 
         # Detect line intersections in the filtered points
-        intersection_points = HoughTransformation.detect_line_intersections(filtered_points)
+        intersection_points: list[tuple[float, float]] = HoughTransformation.detect_line_intersections(filtered_points)
+        print(intersection_points)
 
         if len(intersection_points) > 0:
             # Cluster the intersection points to prevent multiple points for the same intersection

@@ -8,7 +8,7 @@ class HoughTransformation:
     __scale_factor: int = 100
 
     @staticmethod
-    def detect_line_intersections(points: np.ndarray):
+    def detect_line_intersections(points: np.ndarray) -> list[tuple[float, float]]:
         """
         Detect line intersections in the given points using the hough transformation.
         :param points: The points to detect line intersections in. The points are represented as a Nx2 array
@@ -21,12 +21,12 @@ class HoughTransformation:
         lines = HoughTransformation.__detect_lines(image)
 
         # Calculate the intersection points. If no intersection points are found, return empty lists
-        intersection_points = HoughTransformation.__calculate_intersections(lines, width, height)
+        intersection_points: list[tuple[float, float]] = HoughTransformation.__calculate_intersections(lines, width, height)
         if len(intersection_points) == 0:
-            return [], []
+            return []
 
         # Convert the intersection points back to the original coordinate space
-        intersection_points = HoughTransformation.__convert_back_to_original_space(points, intersection_points)
+        intersection_points: list[tuple[float, float]] = HoughTransformation.__convert_back_to_original_space(points, intersection_points)
 
         return intersection_points
 
