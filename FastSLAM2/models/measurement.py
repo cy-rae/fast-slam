@@ -8,8 +8,8 @@ class Measurement:
     Class to represent the measurements of an observed landmark (distance and angle in radians).
     """
 
-    def __init__(self, distance: float, yaw: float):
-        self.landmark_id: uuid.UUID = uuid.uuid4()
+    def __init__(self, landmark_id: uuid.UUID, distance: float, yaw: float):
+        self.landmark_id: uuid.UUID = landmark_id
         self.distance = distance
         self.yaw = yaw
 

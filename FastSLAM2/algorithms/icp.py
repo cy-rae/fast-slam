@@ -5,7 +5,12 @@ from sklearn.neighbors import KDTree
 
 class ICP:
     @staticmethod
-    def run(source_points: ndarray, target_points: ndarray, max_iterations=100, tolerance=1e-6):
+    def run(
+            source_points: ndarray,
+            target_points: ndarray,
+            max_iterations=100,
+            tolerance=1e-6
+    ) -> tuple[ndarray, ndarray]:
         """
         Iterative closest point algorithm for 2D point clouds to find the optimal rotation and translation between them.
         :param source_points: Nx2 array of source points

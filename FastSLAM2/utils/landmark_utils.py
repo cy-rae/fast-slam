@@ -36,7 +36,7 @@ class LandmarkUtils:
         measurements = []
         for landmark in observed_landmarks:
             dist, angle = GeometryUtils.calculate_distance_and_angle(landmark.x, landmark.y)
-            measurements.append(Measurement(dist, angle))
+            measurements.append(Measurement(landmark.id, dist, angle))
 
         # Update the known landmarks with the updated landmarks
         LandmarkUtils.__update_known_landmarks(observed_landmarks)

@@ -2,6 +2,7 @@
 import random
 
 import numpy as np
+from numpy import ndarray
 from scipy.stats import multivariate_normal
 
 from FastSLAM2.config import NUM_PARTICLES, TRANSLATION_NOISE, ROTATION_NOISE, MEASUREMENT_NOISE
@@ -29,15 +30,15 @@ class FastSLAM2:
             ) for _ in range(NUM_PARTICLES)
         ]
 
-    def iterate(self, d_linear: float, d_angular: float, measurements: list[Measurement]):
+    def iterate(self, translation_vector: ndarray, rotation: float, measurements: list[Measurement]):
         """
-        Perform one iteration of the FastSLAM2 2.0 algorithm using the passed linear and angular delta values and the measurements.
-        :param d_linear: linear delta value
-        :param d_angular: angular delta value
-        :param measurements: list of measurements to observed landmarks (distances and angles of landmark to robot and landmark ID)
+        Perform one iteration of the FastSLAM2 2.0 algorithm using the passed translation, rotation, and measurements.
+        :param translation_vector: The translation vector of the robot
+        :param rotation: The rotation angle of the robot in radians
+        :param measurements: List of measurements to observed landmarks (distances and angles of landmark to robot and landmark ID)
         """
         # Update particle poses
-        self.__move_particles(d_linear, d_angular)
+        self.__move_particles(translation_vector, rotation)
 
         # Update particles (landmarks and weights)
         for measurement in measurements:
@@ -100,44 +101,41 @@ class FastSLAM2:
                     likelihood = multivariate_normal.pdf(innovation, mean=np.zeros(len(innovation)), cov=observation_cov)
 
                     # Update the particle weight with the likelihood
-                    # print('\nlikelihood', likelihood)
                     particle.weight *= likelihood
-                    # print('nw', particle.weight)
 
-        # Normalisieren der Gewichte
+        # Normalize weights and resample particles
         total_weight = sum(particle.weight for particle in self.particles)
         if total_weight > 0:
             for particle in self.particles:
                 particle.weight /= total_weight
 
         weights = np.array([particle.weight for particle in self.particles])
-        # print('\nNW', weights)
 
-        # Überprüfen der Summe der Gewichte
+        # Check if the sum of the particle weights is zero
         if np.sum(weights) == 0:
-            raise ValueError("Die Summe der Partikelgewichte ist null! Überprüfen Sie die Gewichtungslogik.")
+            raise ValueError("The sum of the particle weights is zero. Check the weight update step.")
 
-        # Effektive Partikelzahl
+        # Effective number of particles
         N_eff = 1.0 / np.sum(weights ** 2)
 
-        # Resampling nur durchführen, wenn N_eff klein ist
+        # Resample particles if the effective number of particles is less than half of the total number of particles
         if N_eff < len(self.particles) / 2:
             self.particles = self.__systematic_resample()
 
-    def __move_particles(self, d_linear: float, d_angular: float):
+    def __move_particles(self, translation_vector: ndarray, rotation: float):
         """
-        Update the poses of the particles based on the passed linear and angular delta values.
-        :param d_linear: linear delta value
-        :param d_angular: angular delta value
+        Update the poses of the particles based on the passed translation vector and rotation.
+        :param translation_vector: The translation vector of the robot
+        :param rotation: The rotation angle of the robot in radians
         """
         # Apply uncertainty to the movement of the robot and particles using random Gaussian noise with the standard deviations
-        d_linear += random.gauss(0, TRANSLATION_NOISE)
-        d_angular += random.gauss(0, ROTATION_NOISE)
+        translation_vector += random.gauss(0, TRANSLATION_NOISE)
+        rotation += random.gauss(0, ROTATION_NOISE)
 
         for p in self.particles:
-            p.yaw = (p.yaw + d_angular + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
-            p.x += d_linear * np.cos(p.yaw)
-            p.y += d_linear * np.sin(p.yaw)
+            p.yaw = (p.yaw + rotation + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
+            p.x += translation_vector[0]
+            p.y += translation_vector[1]
 
     def __systematic_resample(self):
         """

@@ -1,11 +1,11 @@
 from numpy import ndarray
 
-from FastSLAM2 import FastSLAM2
 from FastSLAM2.models.robot import Robot
-from FastSLAM2.utils.evaluation_utils import EvaluationUtils
-from FastSLAM2.utils.interpreter import Interpreter
 from FastSLAM2.utils.landmark_utils import LandmarkUtils
+from FastSLAM2.algorithms.fast_slam_2 import FastSLAM2
+from FastSLAM2.utils.interpreter import Interpreter
 from FastSLAM2.utils.serializer import Serializer
+from FastSLAM2.utils.evaluation_utils import EvaluationUtils
 
 # Initialize the robot, FastSLAM 2.0 algorithm and landmark list
 robot = Robot()
@@ -22,7 +22,7 @@ while True:
     # Get the translation and rotation of the robot using ICP based on the scanned points and the previous points that the robot has saved.
     translation_vector, rotation = robot.get_transformation(scanned_points)
 
-    # Search for landmarks in the scanned points using line filter and IEPF and get the measurements to them and their points
+    # Search for landmarks in the scanned points using line filter and hough transformation and get the measurements to them
     measurement_list = LandmarkUtils.get_measurements_to_landmarks(scanned_points)
 
     # Iterate the FastSLAM2 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks

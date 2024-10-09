@@ -76,14 +76,14 @@ class Robot(DirectedPoint):
         HAL.setV(v)
         HAL.setW(w)
 
-    def get_transformation(self, target_points: ndarray) -> tuple[float, ndarray]:
+    def get_transformation(self, target_points: ndarray) -> tuple[ndarray, float]:
         """
         Get the rotation and translation between the source and target points using the Iterative Closest Point (ICP) algorithm.
         :param target_points: Nx2 array of target points
         :return: Returns the rotation in radians and translation vector
         """
         # Get the rotation matrix and translation vector between the previous and target points using ICP
-        rotation_matrix, translation_vector = ICP.run(self.__prev_points, target_points)
+        translation_vector, rotation_matrix = ICP.run(self.__prev_points, target_points)
 
         # Covert the rotation matrix to an angle in radians
         rotation = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
@@ -91,4 +91,4 @@ class Robot(DirectedPoint):
         # Update the previous points with the target points for the next iteration
         self.__prev_points = target_points
 
-        return rotation, translation_vector
+        return translation_vector, rotation
