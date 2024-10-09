@@ -57,14 +57,15 @@ class LandmarkUtils:
         # Detect line intersections in the filtered points
         intersection_points = HoughTransformation.detect_line_intersections(filtered_points)
 
-        # Cluster the intersection points to prevent multiple points for the same intersection
-        # which can happen when multiple lines were detected for the same edge
-        intersection_points = GeometryUtils.cluster_points(
-            point_lists=intersection_points,
-            eps=0.5,
-            # Maximum distance between two samples  for one to be considered as in the neighborhood of the other
-            min_samples=1  # The number of samples in a neighborhood for a point to be considered as a core point
-        )
+        if len(intersection_points) > 0:
+            # Cluster the intersection points to prevent multiple points for the same intersection
+            # which can happen when multiple lines were detected for the same edge
+            intersection_points = GeometryUtils.cluster_points(
+                point_lists=intersection_points,
+                eps=0.5,
+                # Maximum distance between two samples  for one to be considered as in the neighborhood of the other
+                min_samples=1  # The number of samples in a neighborhood for a point to be considered as a core point
+            )
 
         # Get the corners which represent the landmarks
         return LandmarkUtils.__get_corners(intersection_points, filtered_points, threshold=0.2)

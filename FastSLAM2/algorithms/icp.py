@@ -33,6 +33,9 @@ class ICP:
 
             # Corresponding points from target
             matched_points = target_points[indices]
+            matched_points = matched_points.reshape(-1, 2)  # Reshape to Nx2 array
+            print('target_points:', target_points)
+            print('matched_points:', matched_points)
 
             # Compute centroids of both point sets
             source_centroid = np.mean(source_points, axis=0)
