@@ -13,7 +13,6 @@ from .models.robot import Robot
 from .utils.geometry_utils import GeometryUtils
 from .utils.landmark_utils import LandmarkUtils
 from .utils.serializer import Serializer
-from .utils.interpreter import Interpreter
 from .utils.evaluation_utils import EvaluationUtils
 
 # Provide algorithms

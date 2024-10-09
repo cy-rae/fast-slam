@@ -9,7 +9,6 @@ from FastSLAM2.config import NUM_PARTICLES, TRANSLATION_NOISE, ROTATION_NOISE, M
 from FastSLAM2.models.landmark import Landmark
 from FastSLAM2.models.measurement import Measurement
 from FastSLAM2.models.particle import Particle
-from FastSLAM2.models.point import Point
 
 
 class FastSLAM2:
@@ -122,6 +121,9 @@ class FastSLAM2:
         if N_eff < len(self.particles) / 2:
             self.particles = self.__systematic_resample()
 
+        # Return the estimated position of the robot
+        return self.__estimate_robot_position()
+
     def __move_particles(self, translation_vector: ndarray, rotation: float):
         """
         Update the poses of the particles based on the passed translation vector and rotation.
@@ -159,3 +161,29 @@ class FastSLAM2:
         resampled_particles = [self.particles[i] for i in indices]
 
         return resampled_particles
+
+    def __estimate_robot_position(self) -> tuple[float, float, float]:
+        """
+        Calculate the estimated position of the robot based on the particles.
+        The estimation is based on the mean of the particles.
+        :return: Returns the estimated position of the robot as a tuple (x, y, yaw)
+        """
+        x_mean = 0.0
+        y_mean = 0.0
+        yaw_mean = 0.0
+        total_weight = sum(p.weight for p in self.particles)
+        # print(total_weight)
+
+        # Calculate the mean of the particles
+        for p in self.particles:
+            x_mean += p.x * p.weight
+            y_mean += p.y * p.weight
+            yaw_mean += p.yaw * p.weight
+
+        # Normalize the estimated position
+        x_mean /= total_weight
+        y_mean /= total_weight
+        yaw_mean /= total_weight
+        yaw_mean = (yaw_mean + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw is between -pi and pi
+
+        return x_mean, y_mean, yaw_mean
