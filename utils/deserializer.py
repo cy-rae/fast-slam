@@ -1,6 +1,8 @@
 ﻿import json
 import os
 
+from exceptiongroup import catch
+
 
 class Deserializer:
     """
@@ -24,7 +26,10 @@ class Deserializer:
 
         # Read the JSON data from the file
         with open(file_path, 'r') as file:
-            json_data: dict = json.load(file)
+            try:
+                json_data: dict = json.load(file)
+            except Exception as e:
+                return None, [], []
 
             robot: tuple[float, float, float] = Deserializer.__deserialize_directed_point(json_data['robot'])
             particles: list[tuple[float, float, float]] = Deserializer.__deserialize_directed_points(

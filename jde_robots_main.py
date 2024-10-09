@@ -22,7 +22,6 @@ while True:
 
     # Get the translation and rotation of the robot using ICP based on the scanned points and the previous points that the robot has saved.
     translation_vector, rotation = robot.get_transformation(scanned_points)
-    print(translation_vector, rotation)
 
     robot.yaw = (robot.yaw + rotation + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
     robot.x += translation_vector[0]
@@ -35,8 +34,8 @@ while True:
     # # and estimate the position of the robot based on the particles.
     # (robot.x, robot.y, robot.yaw) = fast_slam.iterate(translation_vector, rotation, measurement_list)
     #
-    # # Serialize the robot, particles, and landmarks to a JSON file and store it in the shared folder
-    # Serializer.serialize(robot, fast_slam.particles, LandmarkUtils.known_landmarks)
+    # Serialize the robot, particles, and landmarks to a JSON file and store it in the shared folder
+    Serializer.serialize(robot, fast_slam.particles, LandmarkUtils.known_landmarks)
     #
     # # Validate the robot's position based on the actual position
     # EvaluationUtils.evaluate_estimation(robot)

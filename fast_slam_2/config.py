@@ -9,7 +9,7 @@ NUM_PARTICLES = 20
 # Translation and rotation noise represent the standard deviation of the translation and rotation.
 # The noise is used to add uncertainty to the movement of the robot and particles.
 TRANSLATION_NOISE = 0.01
-ROTATION_NOISE = 0.001
+ROTATION_NOISE = 0.2
 
 # The measurement noise of the Kalman filter depends on the laser's accuracy
 MEASUREMENT_NOISE = np.array([[0.01, 0.0], [0.0, 0.01]])

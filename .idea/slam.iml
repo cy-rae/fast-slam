@@ -8,6 +8,6 @@
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings">
-    <option name="requirementsPath" value="C:\DHBW_CAS\slam\FastSLAM2\requirements.txt" />
+    <option name="requirementsPath" value="C:\DHBW_CAS\slam\fast_slam_2\requirements.txt" />
   </component>
 </module>

@@ -1,6 +1,6 @@
 ﻿import numpy as np
 from numpy import ndarray
-from sklearn.neighbors import KDTree
+from scipy.spatial import KDTree
 
 
 class ICP:
@@ -8,7 +8,7 @@ class ICP:
     def run(
             source_points: ndarray,
             target_points: ndarray,
-            max_iterations=100,
+            max_iterations=300,
             tolerance=1e-6
     ) -> tuple[ndarray, ndarray]:
         """
