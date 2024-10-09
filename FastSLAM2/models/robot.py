@@ -29,7 +29,7 @@ class Robot(DirectedPoint):
         laser_data = HAL.getLaserData()
 
         # Convert each laser data value to a point
-        scanned_points = np.empty(180, dtype=object)
+        scanned_points = []
         for i in range(180):  # Laser data has 180 values
             # Extract the distance at index i
             dist = laser_data.values[i]
@@ -44,8 +44,8 @@ class Robot(DirectedPoint):
             # Compute x, y coordinates from distance and angle
             x = dist * math.cos(angle)
             y = dist * math.sin(angle)
-            scanned_points[i] = np.array([x, y])
-        return scanned_points
+            scanned_points.append([x, y])
+        return np.array(scanned_points)
 
     @staticmethod
     def move():
