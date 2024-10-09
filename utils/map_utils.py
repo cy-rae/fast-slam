@@ -42,15 +42,15 @@ class MapUtils:
         _, ax = plt.subplots(figsize=(10, 10))
 
         # Set limits and labels
-        ax.set_xlim([-20, 20])
-        ax.set_ylim([-20, 20])
+        ax.set_xlim([-10, 10])
+        ax.set_ylim([-10, 10])
         ax.axhline(0, color='black', linewidth=1)  # x axis
         ax.axvline(0, color='black', linewidth=1)  # y axis
 
         # Axis labels
         ax.set_xlabel('x axis')
         ax.set_ylabel('y axis')
-        ax.text(-21, 22, "Map created by the fast_slam_2 2.0 algorithm", fontsize=12, color='black')
+        ax.text(-11, 11, "Map created by the fast_slam_2 2.0 algorithm", fontsize=12, color='black')
         ax.grid(True) # Show grid
 
         return ax

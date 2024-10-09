@@ -30,6 +30,10 @@ class EvaluationUtils:
         # Calculate the average deviation of the robot in percentage
         average_deviation = (x_deviation + y_deviation + angular_deviation) / 3
 
+        print("\nX", actual_pos.x, estimated_pos.x)
+        print("Y", actual_pos.y, estimated_pos.y)
+        print("Yaw", actual_pos.yaw, estimated_pos.yaw)
+
         # Print the validation results
         print(f"\nAverage deviation: {average_deviation:.2f}%")
         print(f"X deviation: {x_deviation:.2f}%")

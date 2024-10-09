@@ -17,16 +17,3 @@ class DirectedPoint(Point):
             'y': self.y,
             'yaw': self.yaw,
         }
-
-    @staticmethod
-    def from_dict(data):
-        """
-        Create a directed point object from the passed data
-        :param data: This data contains the properties of the directed point
-        :return: Returns the directed point object
-        """
-        return DirectedPoint(
-            x=data['x'],
-            y=data['y'],
-            yaw=data['yaw'],
-        )
