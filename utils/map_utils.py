@@ -22,10 +22,10 @@ class MapUtils:
         try:
             ax = MapUtils.__init_plot()
 
-            MapUtils.__plot_as_arrows(ax, directed_points=[robot], scale=10,
-                                      color='red')  # Plot the robot as a red arrow
-            MapUtils.__plot_as_arrows(ax, directed_points=particles, scale=7,
-                                      color='blue')  # Plot the particles as blue arrows
+            MapUtils.__plot_as_arrows(ax, directed_points=[robot], scale=5,
+                                      color='red', zorder=2)  # Plot the robot as a red arrow
+            MapUtils.__plot_as_arrows(ax, directed_points=particles, scale=6,
+                                      color='blue', zorder=1)  # Plot the particles as blue arrows
             MapUtils.__plot_as_dots(ax, landmarks, 'green')  # Mark landmarks as green dots
 
             # Show the plot
@@ -39,41 +39,37 @@ class MapUtils:
         Initialize the plot
         """
         # Create a figure and axis
-        fig, ax = plt.subplots(figsize=(10, 10))
+        _, ax = plt.subplots(figsize=(10, 10))
 
         # Set limits and labels
-        ax.set_xlim(0, 1500)
-        ax.set_ylim(0, 1500)
-        ax.axhline(750, color='black', linewidth=2)  # X-Achse
-        ax.axvline(750, color='black', linewidth=2)  # Y-Achse
+        ax.set_xlim([-20, 20])
+        ax.set_ylim([-20, 20])
+        ax.axhline(0, color='black', linewidth=1)  # x axis
+        ax.axvline(0, color='black', linewidth=1)  # y axis
 
         # Axis labels
-        ax.text(1400, 760, "X-axis", fontsize=12, color='black')
-        ax.text(760, 10, "Y-axis", fontsize=12, color='black')
-        ax.text(0, 10, "Map created by the fast_slam_2 2.0 algorithm", fontsize=12, color='black')
+        ax.set_xlabel('x axis')
+        ax.set_ylabel('y axis')
+        ax.text(-21, 22, "Map created by the fast_slam_2 2.0 algorithm", fontsize=12, color='black')
+        ax.grid(True) # Show grid
 
         return ax
 
     @staticmethod
-    def __plot_as_arrows(ax, directed_points: list[tuple[float, float, float]], scale: float, color: str):
+    def __plot_as_arrows(ax, directed_points: list[tuple[float, float, float]], scale: float, color: str, zorder: int):
         """
         Plot the passed directed points as arrows with the passed scale and color.
         :param directed_points: This list contains all the directed points which will be represented as arrows
         :param scale: The scale of the arrow
         :param color: The color of the arrow
         """
-        center_x = 750  # Middle of the X-axis
-        center_y = 750  # Middle of the Y-axis
-        for directed_point in directed_points:
-            # Calculate the start and end point of the arrow
-            x_start = center_x + directed_point[0] * 50  # Scale the X-coordinate
-            y_start = center_y - directed_point[1] * 50  # Scale the Y-coordinate
-            x_end = x_start + np.cos(directed_point[2]) * scale
-            y_end = y_start - np.sin(directed_point[2]) * scale
+        for (x, y, yaw) in directed_points:
+            # Calculate the vector components
+            dx = np.cos(yaw)  # x-component
+            dy = np.sin(yaw)  # y-component
 
             # Draw the arrow
-            ax.arrow(x_start, y_start, x_end - x_start, y_end - y_start,
-                     head_width=5, head_length=10, fc=color, ec=color)
+            ax.quiver(x, y, dx, dy, angles='xy', scale_units='inches', scale=scale, color=color, zorder=zorder)
 
     @staticmethod
     def __plot_as_dots(ax, points: list[tuple[float, float]], color: str):
@@ -83,7 +79,4 @@ class MapUtils:
         :param color: The color of the dot ('k' -> black, 'g' -> green)
         """
         for point in points:
-            x = 750 + point[0] * 50  # Scale the X-coordinate
-            y = 750 - point[1] * 50  # Scale the Y-coordinate
-            radius = 5  # Size of the dots
-            ax.plot(x, y, 'o', color=color, markersize=radius)
+            ax.plot(point[0], point[1], color + 'o', markersize=5, label='Punkte')
