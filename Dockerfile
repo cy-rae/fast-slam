@@ -13,3 +13,5 @@ WORKDIR /workspace/code
 COPY setup.py .
 COPY FastSLAM2/ FastSLAM2/
 RUN pip install .
+
+WORKDIR /

@@ -29,7 +29,7 @@ class Robot(DirectedPoint):
         laser_data = HAL.getLaserData()
 
         # Convert each laser data value to a point
-        scanned_points = np.empty(180, dtype=ndarray[float])
+        scanned_points = np.empty(180, dtype=object)
         for i in range(180):  # Laser data has 180 values
             # Extract the distance at index i
             dist = laser_data.values[i]

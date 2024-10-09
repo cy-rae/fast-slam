@@ -2,5 +2,5 @@
 
 ### Run startup.sh
 ```bash
-bash run-dhbw-tube.sh
+bash startup.sh
 ```
