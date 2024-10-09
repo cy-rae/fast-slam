@@ -16,5 +16,8 @@ from .utils.serializer import Serializer
 from .utils.interpreter import Interpreter
 from .utils.evaluation_utils import EvaluationUtils
 
-# Provide algorithm
-from .fast_slam_2 import FastSLAM2
+# Provide algorithms
+from .algorithms.icp import ICP
+from .algorithms.line_filter import LineFilter
+from .algorithms.hough_transformation import HoughTransformation
+from .algorithms.fast_slam_2 import FastSLAM2
