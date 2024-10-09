@@ -2,10 +2,7 @@
 import matplotlib.pyplot as plt
 
 from FastSLAM2.models.directed_point import DirectedPoint
-from FastSLAM2.models.landmark import Landmark
-from FastSLAM2.models.particle import Particle
 from FastSLAM2.models.point import Point
-from FastSLAM2.models.robot import Robot
 
 
 class MapUtils:
