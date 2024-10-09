@@ -30,7 +30,7 @@ class LandmarkUtils:
         observed_landmarks: list[Landmark] = LandmarkUtils.get_observed_landmarks(scanned_points)
 
         # Associate the observed landmarks with the existing landmarks. The IDs of the landmarks will be updated if a landmark is found.
-        observed_landmarks = LandmarkUtils.__associate_landmarks(observed_landmarks)
+        observed_landmarks: list[Landmark] = LandmarkUtils.__associate_landmarks(observed_landmarks)
 
         # Calculate the distance and angle of the corners to the origin (0, 0)
         measurements = []
@@ -56,7 +56,6 @@ class LandmarkUtils:
 
         # Detect line intersections in the filtered points
         intersection_points: list[tuple[float, float]] = HoughTransformation.detect_line_intersections(filtered_points)
-        print(intersection_points)
 
         if len(intersection_points) > 0:
             # Cluster the intersection points to prevent multiple points for the same intersection
