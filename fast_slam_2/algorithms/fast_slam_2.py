@@ -102,10 +102,6 @@ class FastSLAM2:
                     # Update the particle weight with the likelihood
                     particle.weight *= likelihood
 
-                    if particle.weight > 1:
-                        print('Particle weight:', particle.weight)
-                        print('Particle:', particle.x, particle.y, particle.yaw)
-
         # Normalize weights and resample particles
         weights = self.__get_normalized_weights()
 
@@ -142,12 +138,13 @@ class FastSLAM2:
         :return: Returns the normalized weights as a Nx2 array
         """
         total_weight = sum(p.weight for p in self.particles)
-        if total_weight > 1e-10:
+
+        if total_weight < 1e-5:
             for p in self.particles:
                 p.weight = 1.0 / NUM_PARTICLES
         else:
             for p in self.particles:
-                p.weight /= total_weight
+                p.weight = 0 if p.weight < 1e-5 else p.weight / total_weight
 
         return np.array([particle.weight for particle in self.particles])
 
@@ -174,8 +171,8 @@ class FastSLAM2:
         for m in range(NUM_PARTICLES):
             u = rand_starting_point + m * step
             while u > particle_weight and particle_index < NUM_PARTICLES:
-                particle_index += 1
                 particle_weight += weights[particle_index]
+                particle_index += 1
             new_particles.append(self.particles[particle_index])
 
         # Update the particles

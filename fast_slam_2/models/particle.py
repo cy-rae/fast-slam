@@ -15,6 +15,9 @@ class Particle(DirectedPoint):
         self.weight = 1.0 / NUM_PARTICLES
         self.landmarks: list[Landmark] = []
 
+    def __str__(self):
+        return f"Particle: x: {self.x}, y: {self.y}, yaw: {self.yaw}, weight: {self.weight}, landmarks: {self.landmarks}"
+
     def get_landmark(self, landmark_id: uuid.UUID) -> int or None:
         """
         Get the landmark and its index with the passed ID.
