@@ -6,7 +6,7 @@ ENV http_proxy=http://rb-proxy-de.bosch.com:8080
 ENV https_proxy=http://rb-proxy-de.bosch.com:8080
 
 # Install dependencies
-#RUN apt-get update
+RUN apt-get update
 
 # Copy the fast_slam_2 module into the container
 WORKDIR /workspace/code
@@ -19,4 +19,5 @@ RUN pip install --no-cache-dir -r fast_slam_2/requirements.txt
 # Install the fast_slam_2 module
 RUN pip install .
 
+# Return to the root directory
 WORKDIR /

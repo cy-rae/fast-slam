@@ -70,3 +70,36 @@ class ICP:
             rotation_matrix = new_rotation_matrix
 
         return translation_vector, rotation_matrix
+
+    @staticmethod
+    def best_fit_transform(source_points, target_points):
+        """
+        Compute the best fitting rotation matrix and translation vector
+        that aligns the source points to the target points.
+        """
+        # Compute centroids of both point sets
+        centroid_source = np.mean(source_points, axis=0)
+        centroid_target = np.mean(target_points, axis=0)
+
+        # Center the points
+        centered_source = source_points - centroid_source
+        centered_target = target_points - centroid_target
+
+        # Compute covariance matrix
+        H = centered_source.T @ centered_target
+
+        # Singular Value Decomposition (SVD)
+        U, S, Vt = np.linalg.svd(H)
+
+        # Compute the rotation matrix
+        R = Vt.T @ U.T
+
+        # Handle reflection case (det(R) should be 1, if det(R) == -1, we correct it)
+        if np.linalg.det(R) < 0:
+            Vt[-1, :] *= -1
+            R = Vt.T @ U.T
+
+        # Compute the translation vector
+        t = centroid_target.T - R @ centroid_source.T
+
+        return R, t

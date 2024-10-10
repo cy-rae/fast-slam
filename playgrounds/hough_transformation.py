@@ -19,7 +19,10 @@ class LandmarkService:
         image, width, height = LandmarkService.__create_hough_transformation_image(scanned_points)
 
         # Detect lines using hough transformation
-        lines = LandmarkService.__hough_line_detection(image)
+        edges, lines = LandmarkService.__hough_line_detection(image)
+
+        # Plot Canny and Hough results
+        LandmarkService.__plot_canny_hough_results(image, edges, lines)
 
         # Calculate the intersection points and cluster them to prevent multiple points for the same intersection
         # which can happen when multiple lines were detected for the same edge
@@ -68,9 +71,48 @@ class LandmarkService:
         edges = cv2.Canny(image, 100, 150, apertureSize=3)
 
         # Schritt 5: Verwende die Hough-Transformation zur Linienerkennung
-        lines = cv2.HoughLines(edges, 1, np.pi / 180, 90)
+        lines = cv2.HoughLines(edges, 1, np.pi / 180, 75)
 
-        return lines
+        return edges, lines
+
+    @staticmethod
+    def __plot_canny_hough_results(image, edges, lines):
+        """
+        Plot the results of the Canny edge detection and Hough line detection.
+        :param image: The original image used for Hough transformation
+        :param edges: The edges detected by the Canny edge detector
+        :param lines: The lines detected by the Hough transformation
+        """
+        # Plot the original image and Canny edges
+        plt.figure(figsize=(12, 6))
+
+        plt.subplot(1, 2, 1)
+        plt.imshow(edges, cmap='gray')
+        plt.title('Canny Edge Detection')
+        plt.axis('off')
+
+        # Create a copy of the original image to draw the Hough lines
+        hough_image = np.copy(image)
+        if lines is not None:
+            for line in lines:
+                rho, theta = line[0]
+                a = np.cos(theta)
+                b = np.sin(theta)
+                x0 = a * rho
+                y0 = b * rho
+                x1 = int(x0 + 1000 * (-b))
+                y1 = int(y0 + 1000 * (a))
+                x2 = int(x0 - 1000 * (-b))
+                y2 = int(y0 - 1000 * (a))
+                cv2.line(hough_image, (x1, y1), (x2, y2), 255, 1)
+
+        plt.subplot(1, 2, 2)
+        plt.imshow(hough_image, cmap='gray')
+        plt.title('Hough Line Detection')
+        plt.axis('off')
+
+        plt.tight_layout()
+        plt.show()
 
     @staticmethod
     def __calculate_intersections(lines, width, height) -> list[tuple[float, float]]:

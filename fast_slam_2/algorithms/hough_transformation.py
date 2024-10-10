@@ -74,7 +74,7 @@ class HoughTransformation:
         edges = cv2.Canny(image, 100, 150, apertureSize=3)
 
         # Use hough transformation to detect lines in the image
-        lines = cv2.HoughLines(edges, 1, np.pi / 180, 90)
+        lines = cv2.HoughLines(edges, 1, np.pi / 180, 75)
 
         return lines
 

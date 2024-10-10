@@ -29,15 +29,15 @@ class FastSLAM2:
             ) for _ in range(NUM_PARTICLES)
         ]
 
-    def iterate(self, translation_vector: ndarray, rotation: float, measurements: list[Measurement]):
+    def iterate(self, d_lin: float, rotation: float, measurements: list[Measurement]):
         """
         Perform one iteration of the fast_slam_2 2.0 algorithm using the passed translation, rotation, and measurements.
-        :param translation_vector: The translation vector of the robot
+        :param d_lin: The translation vector of the robot
         :param rotation: The rotation angle of the robot in radians
         :param measurements: List of measurements to observed landmarks (distances and angles of landmark to robot and landmark ID)
         """
         # Update particle poses
-        self.__move_particles(translation_vector, rotation)
+        self.__move_particles(d_lin, rotation)
 
         # Update particles (landmarks and weights)
         for measurement in measurements:
@@ -124,20 +124,20 @@ class FastSLAM2:
         # Return the estimated position of the robot
         return self.__estimate_robot_position()
 
-    def __move_particles(self, translation_vector: ndarray, rotation: float):
+    def __move_particles(self, d_lin: float, rotation: float):
         """
         Update the poses of the particles based on the passed translation vector and rotation.
-        :param translation_vector: The translation vector of the robot
+        :param d_lin: The translation vector of the robot
         :param rotation: The rotation angle of the robot in radians
         """
         # Apply uncertainty to the movement of the robot and particles using random Gaussian noise with the standard deviations
-        translation_vector += random.gauss(0, TRANSLATION_NOISE)
+        d_lin += random.gauss(0, TRANSLATION_NOISE)
         rotation += random.gauss(0, ROTATION_NOISE)
 
         for p in self.particles:
             p.yaw = (p.yaw + rotation + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
-            p.x += translation_vector[0]
-            p.y += translation_vector[1]
+            p.x += d_lin * np.cos(p.yaw)
+            p.y += d_lin * np.sin(p.yaw)
 
     def __systematic_resample(self):
         """

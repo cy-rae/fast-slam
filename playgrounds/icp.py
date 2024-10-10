@@ -1,84 +1,71 @@
 ﻿import numpy as np
-from numpy import ndarray
-from scipy.spatial import KDTree
 
 
-def icp(source_points: ndarray, target_points: ndarray, max_iterations=100, tolerance=1e-6):
+def best_fit_transform(source_points, target_points):
     """
-    ICP algorithm for 2D point clouds to find the optimal rotation and translation between them.
-    :param source_points: Nx2 array of source points
-    :param target_points: Nx2 array of target points
-    :param max_iterations: Maximum number of iterations
-    :param tolerance: Tolerance for convergence
-    :return: Returns the rotation in radians and translation vector
+    Compute the best fitting rotation matrix and translation vector
+    that aligns the source points to the target points.
     """
-    # Initial transformation with identity matrix and zero vector
-    rotation_matrix = np.eye(2)
-    translation_vector = np.zeros((2,))
+    # Compute centroids of both point sets
+    centroid_source = np.mean(source_points, axis=0)
+    centroid_target = np.mean(target_points, axis=0)
 
-    for _ in range(max_iterations):
-        # Apply the current transformation to source points
-        transformed_points = np.dot(source_points, rotation_matrix.T) + translation_vector
+    # Center the points
+    centered_source = source_points - centroid_source
+    centered_target = target_points - centroid_target
 
-        # Find nearest neighbors in target point cloud
-        tree = KDTree(target_points)
-        _, indices = tree.query(transformed_points)
+    # Compute covariance matrix
+    H = centered_source.T @ centered_target
 
-        # Corresponding points from target
-        matched_points = target_points[indices]
+    # Singular Value Decomposition (SVD)
+    U, S, Vt = np.linalg.svd(H)
 
-        # Compute centroids of both point sets
-        source_centroid = np.mean(source_points, axis=0)
-        target_centroid = np.mean(matched_points, axis=0)
+    # Compute the rotation matrix
+    R = Vt.T @ U.T
 
-        # Center the points around the centroids
-        source_centered = source_points - source_centroid
-        target_centered = matched_points - target_centroid
+    # Handle reflection case (det(R) should be 1, if det(R) == -1, we correct it)
+    if np.linalg.det(R) < 0:
+        Vt[-1, :] *= -1
+        R = Vt.T @ U.T
 
-        # Compute covariance matrix
-        cov = np.dot(source_centered.T, target_centered)
+    # Compute the translation vector
+    t = centroid_target.T - R @ centroid_source.T
 
-        # Singular Value Decomposition (SVD)
-        U, _, Vt = np.linalg.svd(cov)
-
-        # Compute optimal rotation
-        new_rotation_matrix = np.dot(U, Vt)
-
-        # Ensure it's a proper rotation (det(rotation_matrix) = 1)
-        if np.linalg.det(new_rotation_matrix) < 0:
-            Vt[1, :] *= -1
-            new_rotation_matrix = np.dot(U, Vt)
-
-        # Compute optimal translation
-        new_translation_vector = target_centroid - np.dot(source_centroid, new_rotation_matrix.T)
-
-        # Check for convergence
-        if np.linalg.norm(new_rotation_matrix - rotation_matrix) < tolerance and np.linalg.norm(new_translation_vector - translation_vector) < tolerance:
-            break
-
-        # Update transformation
-        rotation_matrix = new_rotation_matrix
-        translation_vector = new_translation_vector
-
-    # Covert the rotation matrix to an angle in radians
-    rotation = np.arctan2(R[1, 0], R[0, 0])
-
-    return rotation, translation_vector
+    return R, t
 
 
-def rotation_matrix_to_angle(R):
-    """
-    Converts a 2D rotation matrix to an angle in radians.
-    """
-    # Extract the angle from the rotation matrix
-    theta = np.arctan2(R[1, 0], R[0, 0])  # arctan2(sin(θ), cos(θ))
-    return theta
+def generate_test_data():
+    # Definierte Source Points (z.B. ein Dreieck in 2D)
+    source_points = np.array([[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]])
 
-# Beispiel-Punktwolken aus vorherigen Laserscans
-laser_scan2 = np.random.uniform(1.0, 10.0, 180)  # Neuer Laserscan für einen weiteren Zeitschritt
-point_cloud2 = polar_to_cartesian(laser_scan2)
+    # Definiere den Winkel für die Rotation (45 Grad = Pi/4)
+    theta = np.pi / 4
+    R = np.array([[np.cos(theta), -np.sin(theta)],
+                  [np.sin(theta), np.cos(theta)]])  # Rotationsmatrix
 
-# ICP anwenden, um die Transformation zwischen den Punktwolken zu berechnen
-R, t = icp(point_cloud1, point_cloud2)
-print("Rotation:\n", R)
-print("Translation:\n", t)
+    # Definiere den Translationsvektor
+    t = np.array([2, 3])
+
+    # Wende die Rotation und Translation auf die Source Points an, um die Target Points zu generieren
+    target_points = (R @ source_points.T).T + t
+
+    return source_points, target_points
+
+
+# Example usage
+if __name__ == "__main__":
+    # Generiere neue Testdaten
+    source_points, target_points = generate_test_data()
+
+    print("Source Points:")
+    print(source_points)
+    print("Target Points (after rotation and translation):")
+    print(target_points)
+
+    # Berechne die Rotationsmatrix und den Translationsvektor
+    R, t = best_fit_transform(source_points, target_points)
+
+    print("Calculated Rotation matrix:")
+    print(R)
+    print("Calculated Translation vector:")
+    print(t)
