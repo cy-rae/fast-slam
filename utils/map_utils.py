@@ -24,7 +24,7 @@ class MapUtils:
 
             MapUtils.__plot_as_arrows(ax, directed_points=[robot], scale=5,
                                       color='red', zorder=2)  # Plot the robot as a red arrow
-            MapUtils.__plot_as_arrows(ax, directed_points=particles, scale=6,
+            MapUtils.__plot_as_arrows(ax, directed_points=particles, scale=5,
                                       color='blue', zorder=1)  # Plot the particles as blue arrows
             MapUtils.__plot_as_dots(ax, landmarks, 'g')  # Mark landmarks as green dots
 
