@@ -38,4 +38,4 @@ while True:
     Serializer.serialize(robot, fast_slam.particles, LandmarkUtils.known_landmarks)
 
     # Validate the robot's position based on the actual position
-    # EvaluationUtils.evaluate_estimation(robot)
+    EvaluationUtils.evaluate_estimation(robot)
