@@ -130,11 +130,11 @@ class FastSLAM2:
         :param d_lin: The translation vector of the robot
         :param rotation: The rotation angle of the robot in radians
         """
-        # Apply uncertainty to the movement of the robot and particles using random Gaussian noise with the standard deviations
-        d_lin += random.gauss(0, TRANSLATION_NOISE)
-        rotation += random.gauss(0, ROTATION_NOISE)
-
         for p in self.particles:
+            # Apply uncertainty to the movement of the robot and particles using random Gaussian noise with the standard deviations
+            d_lin += random.gauss(0, TRANSLATION_NOISE)
+            rotation += random.gauss(0, ROTATION_NOISE)
+
             p.yaw = (p.yaw + rotation + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
             p.x += d_lin * np.cos(p.yaw)
             p.y += d_lin * np.sin(p.yaw)
