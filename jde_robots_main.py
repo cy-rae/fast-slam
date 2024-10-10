@@ -1,17 +1,19 @@
+import GUI
 import numpy as np
 from numpy import ndarray
 
+from fast_slam_2 import EvaluationUtils
 from fast_slam_2 import FastSLAM2
+from fast_slam_2 import LandmarkUtils
 from fast_slam_2 import Measurement
 from fast_slam_2 import Robot
-from fast_slam_2 import EvaluationUtils
-from fast_slam_2 import LandmarkUtils
 from fast_slam_2 import Serializer
-from fast_slam_2.models.landmark import Landmark
 
 # Initialize the robot, FastSLAM 2.0 algorithm and landmark list
 robot = Robot()
 fast_slam = FastSLAM2()
+landmarks_gui: list = [[-100, -100, 0] for _ in range(200)]
+GUI.showParticles(landmarks_gui)
 
 # The minimum number of iterations before updating the robot's position based on the estimated position of the particles
 MIN_ITERATIONS = 200
@@ -43,13 +45,10 @@ while True:
         robot.y = y
         robot.yaw = yaw
 
-    # Show landmarks in gui
-    LandmarkUtils.show_landmarks()
-
     # Serialize the robot, particles, and landmarks to a JSON file and store it in the shared folder
     Serializer.serialize(robot, fast_slam.particles, LandmarkUtils.known_landmarks)
 
     # Validate the robot's position based on the actual position
     EvaluationUtils.evaluate_estimation(robot)
 
-    i+=1
+    i += 1

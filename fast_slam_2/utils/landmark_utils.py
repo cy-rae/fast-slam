@@ -1,6 +1,5 @@
 ﻿from uuid import uuid4
 
-import GUI
 import numpy as np
 from numpy import ndarray
 
@@ -140,16 +139,3 @@ class LandmarkUtils:
 
         # Extend the list of known landmarks with the new landmarks
         LandmarkUtils.known_landmarks.extend(new_landmarks)
-
-    @staticmethod
-    def show_landmarks():
-        # Show the landmarks on the GUI
-        landmarks = []
-        for landmark in LandmarkUtils.known_landmarks:
-            landmarks.append([
-                landmark.x - 1,  # The offset for the x-coordinate
-                landmark.y + 1.5,  # The offset for the y-coordinate
-                0  # The orientation of the landmark is irrelevant for the GUI
-            ])
-        landmarks = np.array(landmarks)
-        GUI.showParticles(landmarks)
