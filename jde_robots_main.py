@@ -1,4 +1,3 @@
-import GUI
 import numpy as np
 from numpy import ndarray
 
@@ -12,8 +11,6 @@ from fast_slam_2 import Serializer
 # Initialize the robot, FastSLAM 2.0 algorithm and landmark list
 robot = Robot()
 fast_slam = FastSLAM2()
-landmarks_gui: list = [[-100, -100, 0] for _ in range(200)]
-GUI.showParticles(landmarks_gui)
 
 # The minimum number of iterations before updating the robot's position based on the estimated position of the particles
 MIN_ITERATIONS = 200
