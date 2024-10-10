@@ -106,10 +106,10 @@ class FastSLAM2:
         weights = self.__get_normalized_weights()
 
         # Calculate the number of effective particles
-        N_eff = 1.0 / np.sum(weights ** 2)
+        num_effective_particles = self.__calculate_effective_particles(weights)
 
         # Resample particles if the effective number of particles is less than half of the total number of particles
-        if N_eff < NUM_PARTICLES / 2:
+        if num_effective_particles < NUM_PARTICLES / 2:
             print('RESAMPLING')
             self.__low_variance_resample(weights)
 
@@ -144,7 +144,7 @@ class FastSLAM2:
                 p.weight = 1.0 / NUM_PARTICLES
         else:
             for p in self.particles:
-                p.weight = 0 if p.weight < 1e-5 else p.weight / total_weight
+                p.weight = p.weight if p.weight < 1e-5 else p.weight / total_weight
 
         return np.array([particle.weight for particle in self.particles])
 
@@ -223,3 +223,17 @@ class FastSLAM2:
         yaw_mean = (yaw_mean + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw is between -pi and pi
 
         return x_mean, y_mean, yaw_mean
+
+    @staticmethod
+    def __calculate_effective_particles(weights):
+        """
+        Calculate the effective number of particles.
+         If the weight of all particles is equal, the effective number of particles is equal to the total number of particles.
+        :param weights: The normalized weights of the particles
+        :return: Returns the effective number of particles
+        """
+        total_weight = np.sum(weights ** 2)
+        if total_weight < 1/NUM_PARTICLES:
+            return NUM_PARTICLES
+
+        return 1.0 / np.sum(weights ** 2)
