@@ -58,7 +58,7 @@ class Robot(DirectedPoint):
     def move() -> tuple[int, int]:
         """
         Set the linear and angular velocity of the robot based on the bumper state.
-        :return: Returns Movement.TRANSLATE if the robot moves forward, Movement.ROTATE if the robot rotates
+        :return: Returns the linear and angular velocity of the robot
         """
         # First, move robot in real world
         # Set linear and angular velocity depending on the bumper state.
@@ -76,7 +76,7 @@ class Robot(DirectedPoint):
 
         # If the robot does not hit the wall, the linear and angular velocities will be set to 1 and 0 respectively
         else:
-            v = 1
+            v = 0.5
             w = 0
 
         # Set the linear and angular velocity of the robot
@@ -84,7 +84,6 @@ class Robot(DirectedPoint):
         HAL.setW(w)
 
         return v, w
-        # return Movement.TRANSLATE if v == 1 else Movement.ROTATE
 
     # def get_transformation(self, target_points: ndarray, movement: Movement) -> tuple[float, float]:
     #     """

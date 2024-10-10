@@ -4,7 +4,7 @@ This file contains the configuration parameters for the fast_slam_2 2.0 algorith
 import numpy as np
 
 # Number of particle
-NUM_PARTICLES = 100
+NUM_PARTICLES = 50
 
 # Translation and rotation noise represent the standard deviation of the translation and rotation.
 # The noise is used to add uncertainty to the movement of the robot and particles.
