@@ -6,6 +6,7 @@ from fontTools.merge.util import current_time
 from numpy import ndarray
 
 from fast_slam_2.algorithms.icp import ICP
+from fast_slam_2.config import TRANSLATION_NOISE, ROTATION_NOISE
 from fast_slam_2.enums.movement import Movement
 from fast_slam_2.models.directed_point import DirectedPoint
 
@@ -147,6 +148,10 @@ class Robot(DirectedPoint):
         # Calculate the linear and angular displacement of the robot
         d_lin = np.sqrt((curr_x - self.__prev_x) ** 2 + (curr_y - self.__prev_y) ** 2)
         d_ang = curr_yaw - self.__prev_yaw
+
+        # Add noise to the linear and angular displacement to simulate the odometry noise
+        d_lin += np.random.normal(0, TRANSLATION_NOISE)
+        d_ang += np.random.normal(0, ROTATION_NOISE)
 
         # Update the previous pose of the robot
         self.__prev_x = curr_x
