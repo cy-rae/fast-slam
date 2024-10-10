@@ -51,12 +51,8 @@ class EvaluationUtils:
         # Calculate the difference (delta) between the estimated and actual x-coordinates
         delta = actual - estimated
 
-        # Avoid division by zero; if the estimated x is zero, return 0% deviation
-        if estimated == 0:
-            estimated = 0.001
-
         # Calculate the deviation percentage for the x-coordinate
-        x_deviation_percentage = (abs(delta) / abs(estimated)) * 10  # Times 10 so 100% equals offset of 1 'meter'
+        x_deviation_percentage = abs(delta) * 100  # Times 100 so 100% equals difference of 1 'meter'
 
         return x_deviation_percentage
 
