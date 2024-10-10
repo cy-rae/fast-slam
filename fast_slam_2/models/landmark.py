@@ -16,3 +16,6 @@ class Landmark(Point):
         super().__init__(x, y)
         self.id = identifier
         self.cov = cov
+
+    def __str__(self):
+        return f"Landmark ID: {self.id}, x: {self.x}, y: {self.y}, Covariance: {self.cov}"

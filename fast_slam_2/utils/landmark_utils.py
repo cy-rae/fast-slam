@@ -68,13 +68,13 @@ class LandmarkUtils:
             )
 
         # Get the corners which represent the landmarks
-        return LandmarkUtils.__get_corners(intersection_points, filtered_points, threshold=0.2)
+        return LandmarkUtils.__get_corners(intersection_points, filtered_points, threshold=0.1)
 
     @staticmethod
     def __get_corners(
             intersection_points: list[tuple[float, float]],
             scanned_points: ndarray,
-            threshold=0.2
+            threshold
     ) -> list[Landmark]:
         """
         Search for corners in the environment based on the intersection points and the scanned points.
@@ -123,6 +123,9 @@ class LandmarkUtils:
                     observed_landmark.landmark_id = known_landmark.id
                     break
 
+        print('\nKNOWN LANDMARKS', observed_landmarks)
+        print('OBSERVED LANDMARKS', observed_landmarks)
+
         return observed_landmarks
 
     @staticmethod
@@ -136,6 +139,7 @@ class LandmarkUtils:
 
         # Filter the observed landmarks which are not already known
         new_landmarks = [landmark for landmark in observed_landmarks if landmark.id not in known_landmark_ids]
+        print('NEW LANDMARKS', new_landmarks)
 
         # Extend the list of known landmarks with the new landmarks
         LandmarkUtils.known_landmarks.extend(new_landmarks)
