@@ -14,4 +14,4 @@ class LineFilter:
         """
         x_filtered = ndimage.gaussian_filter1d(points[:, 0], sigma=sigma)
         y_filtered = ndimage.gaussian_filter1d(points[:, 1], sigma=sigma)
-        return np.array([x_filtered, y_filtered])
+        return np.column_stack((x_filtered, y_filtered))

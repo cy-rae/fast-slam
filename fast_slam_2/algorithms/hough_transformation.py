@@ -75,6 +75,7 @@ class HoughTransformation:
 
         # Use hough transformation to detect lines in the image
         lines = cv2.HoughLines(edges, 1, np.pi / 180, 75)
+        print('Lines', lines)
 
         return lines
 

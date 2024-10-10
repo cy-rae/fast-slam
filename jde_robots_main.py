@@ -1,4 +1,3 @@
-import numpy as np
 from numpy import ndarray
 
 from fast_slam_2 import FastSLAM2

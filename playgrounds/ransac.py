@@ -233,9 +233,9 @@ class LandmarkService:
     @staticmethod
     def __get_line_segments(
             scanned_points: np.ndarray,
-            max_lines=3,
-            min_samples=50,
-            residual_threshold=0.3
+            max_lines=1,
+            min_samples=25,
+            residual_threshold=0.1
     ) -> list[tuple[tuple[float, float], tuple[float, float]]]:
         """
         Extract line segments from the scanned points using the RANSAC algorithm.
@@ -297,8 +297,8 @@ class LandmarkService:
 
             # Plot remaining points
             plt.figure(figsize=(8, 6))
-            plt.scatter(remaining_points[:, 0], remaining_points[:, 1], color='blue', s=10, label='Originalpunkte')
-            plt.title('Originale Punkte')
+            plt.scatter(remaining_points[:, 0], remaining_points[:, 1], color='blue', s=10, label='Remaining')
+            plt.title('Remaining Points')
             plt.xlabel('X')
             plt.ylabel('Y')
             plt.grid(True)

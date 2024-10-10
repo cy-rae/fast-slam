@@ -37,11 +37,7 @@ class Robot(DirectedPoint):
             # Extract the distance at index i
             dist = laser_data.values[i]
 
-            # # Set distance to min or max range if it is out of bounds
-            # if dist < laser_data.minRange:
-            #     dist = laser_data.minRange
-            # elif dist > laser_data.maxRange:
-            #     dist = laser_data.maxRange
+            # If the distance is less than the minimum range or greater than the maximum range, skip the point
             if dist < laser_data.minRange or dist > laser_data.maxRange:
                 continue
 
