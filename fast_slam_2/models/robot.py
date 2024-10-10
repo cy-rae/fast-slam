@@ -21,6 +21,9 @@ class Robot(DirectedPoint):
         # Initialize the robot with the first scan
         self.__prev_points: ndarray = self.scan_environment()
         self.__prev_timestamp: int = HAL.getLaserData().timeStamp
+        self.__prev_x = HAL.getPose3d().x
+        self.__prev_y = HAL.getPose3d().y
+        self.__prev_yaw = HAL.getPose3d().yaw
 
     @staticmethod
     def scan_environment() -> ndarray:
@@ -128,5 +131,26 @@ class Robot(DirectedPoint):
         # Calculate the linear and angular displacement of the robot
         d_lin = v * dt / 2
         d_ang = w * dt
+
+        return d_lin, d_ang
+
+    def get_odometry(self) -> tuple[float, float]:
+        """
+        Get the linear and angular displacement of the robot based on the linear and angular velocity.
+        :return: Returns the linear and angular displacement of the robot as a tuple (d_lin, d_ang)
+        """
+        # Get the current pose of the robot
+        curr_x = HAL.getPose().x
+        curr_y = HAL.getPose().y
+        curr_yaw = HAL.getPose().yaw
+
+        # Calculate the linear and angular displacement of the robot
+        d_lin = np.sqrt((curr_x - self.__prev_x) ** 2 + (curr_y - self.__prev_y) ** 2)
+        d_ang = curr_yaw - self.__prev_yaw
+
+        # Update the previous pose of the robot
+        self.__prev_x = curr_x
+        self.__prev_y = curr_y
+        self.__prev_yaw = curr_yaw
 
         return d_lin, d_ang
