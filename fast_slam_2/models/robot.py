@@ -141,9 +141,9 @@ class Robot(DirectedPoint):
         :return: Returns the linear and angular displacement of the robot as a tuple (d_lin, d_ang)
         """
         # Get the current pose of the robot
-        curr_x = HAL.getPose().x
-        curr_y = HAL.getPose().y
-        curr_yaw = HAL.getPose().yaw
+        curr_x = HAL.getPose3d().x
+        curr_y = HAL.getPose3d().y
+        curr_yaw = HAL.getPose3d().yaw
 
         # Calculate the linear and angular displacement of the robot
         d_lin = np.sqrt((curr_x - self.__prev_x) ** 2 + (curr_y - self.__prev_y) ** 2)
