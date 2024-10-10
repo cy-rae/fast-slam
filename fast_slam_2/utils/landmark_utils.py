@@ -118,13 +118,10 @@ class LandmarkUtils:
                 )
 
                 # If the distance from the observed landmark to an existing landmark is smaller than the threshold,
-                # the landmark ID of the corresponding measurement will be overwritten with the ID of the associated landmark.
+                # the landmark ID of the observed landmark will be overwritten with the ID of the associated landmark.
                 if distance < MAXIMUM_LANDMARK_DISTANCE:
-                    observed_landmark.landmark_id = known_landmark.id
+                    observed_landmarks[i] = Landmark(known_landmark.id, observed_landmark.x, observed_landmark.y)
                     break
-
-        print('\nKNOWN LANDMARKS', observed_landmarks)
-        print('OBSERVED LANDMARKS', observed_landmarks)
 
         return observed_landmarks
 
@@ -139,7 +136,9 @@ class LandmarkUtils:
 
         # Filter the observed landmarks which are not already known
         new_landmarks = [landmark for landmark in observed_landmarks if landmark.id not in known_landmark_ids]
-        print('NEW LANDMARKS', new_landmarks)
+
+        for landmark in new_landmarks:
+            print(landmark)
 
         # Extend the list of known landmarks with the new landmarks
         LandmarkUtils.known_landmarks.extend(new_landmarks)
