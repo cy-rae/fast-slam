@@ -2,12 +2,9 @@
 
 import HAL
 import numpy as np
-from fontTools.merge.util import current_time
 from numpy import ndarray
 
-from fast_slam_2.algorithms.icp import ICP
 from fast_slam_2.config import TRANSLATION_NOISE, ROTATION_NOISE
-from fast_slam_2.enums.movement import Movement
 from fast_slam_2.models.directed_point import DirectedPoint
 
 
