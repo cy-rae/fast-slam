@@ -1,5 +1,6 @@
 ﻿import math
 import random
+from copy import deepcopy
 
 import numpy as np
 from numpy import ndarray
@@ -103,10 +104,10 @@ class FastSLAM2:
                     particle.weight *= likelihood
 
         # Normalize weights and resample particles
-        weights = self.__get_normalized_weights()
+        self.__normalize_weights()
 
         # Calculate the number of effective particles
-        num_effective_particles = self.__calculate_effective_particles(weights)
+        num_effective_particles = self.__calculate_effective_particles()
 
         # Resample particles if the effective number of particles is less than half of the total number of particles
         if num_effective_particles < NUM_PARTICLES / 2:
@@ -132,7 +133,7 @@ class FastSLAM2:
             p.y += d_lin * np.sin(p.yaw)
 
 
-    def __get_normalized_weights(self):
+    def __normalize_weights(self):
         """
         Normalizes the weights of all particles.
         :return: Returns the normalized weights as a Nx2 array
@@ -148,32 +149,28 @@ class FastSLAM2:
 
         return np.array([particle.weight for particle in self.particles])
 
-    def __low_variance_resample(self, weights: ndarray):
+    def __low_variance_resample(self):
         """
         Resample particles with low variance resampling.
         :param weights: The normalized weights of the particles
         :return:
         """
-        # Create a list to store the new particles
-        new_particles = []
-
-        # Get random starting point
-        rand_starting_point = np.random.uniform(0, 1 / NUM_PARTICLES)
-
-        # Get index of the first particle
-        particle_weight = weights[0]
-        particle_index = 0
-
-        # Calculate the step size
-        step = 1 / NUM_PARTICLES
+        # Initialize resampling variables
+        new_particles = []  # Create a list to store the new particles
+        rand_starting_point = np.random.uniform(0, 1 / NUM_PARTICLES) # Get random starting point
+        particle_weight = self.particles[0].weight # Get weight of the first particle
+        particle_index = 0 # Initialize particle index
 
         # Resample particles
         for m in range(NUM_PARTICLES):
-            u = rand_starting_point + m * step
-            while u > particle_weight and particle_index < NUM_PARTICLES:
-                particle_weight += weights[particle_index]
-                particle_index += 1
-            new_particles.append(self.particles[particle_index])
+            u = rand_starting_point + m * (1 / NUM_PARTICLES)
+
+            while u > particle_weight:
+                particle_index = min(particle_index + 1, NUM_PARTICLES - 1)  # Ensure index is within bounds
+                particle_weight += self.particles[particle_index].weight
+
+            # Append the new particles
+            new_particles.append(deepcopy(self.particles[particle_index]))
 
         # Update the particles
         self.particles = new_particles
@@ -193,7 +190,6 @@ class FastSLAM2:
 
         # Erstellen der neuen Partikel basierend auf den Indizes
         resampled_particles = [self.particles[i] for i in indices]
-        print('Resampled particles:', len(resampled_particles))
 
         return resampled_particles
 
@@ -222,14 +218,13 @@ class FastSLAM2:
 
         return x_mean, y_mean, yaw_mean
 
-    @staticmethod
-    def __calculate_effective_particles(weights):
+    def __calculate_effective_particles(self) -> float:
         """
         Calculate the effective number of particles.
-         If the weight of all particles is equal, the effective number of particles is equal to the total number of particles.
-        :param weights: The normalized weights of the particles
+        If the weight of all particles is equal, the effective number of particles is equal to the total number of particles.
         :return: Returns the effective number of particles
         """
+        weights = np.array([particle.weight for particle in self.particles])
         total_weight = np.sum(weights ** 2)
         if total_weight < 1/NUM_PARTICLES:
             return NUM_PARTICLES
