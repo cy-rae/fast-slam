@@ -102,25 +102,20 @@ class FastSLAM2:
                     # Update the particle weight with the likelihood
                     particle.weight *= likelihood
 
+                    if particle.weight > 1:
+                        print('Particle weight:', particle.weight)
+                        print('Particle:', particle.x, particle.y, particle.yaw)
+
         # Normalize weights and resample particles
-        total_weight = sum(particle.weight for particle in self.particles)
-        print('Total weight:', total_weight)
-        if total_weight > 1e-10:
-            for particle in self.particles:
-                particle.weight /= total_weight
+        weights = self.__get_normalized_weights()
 
-        weights = np.array([particle.weight for particle in self.particles])
-
-        # Check if the sum of the particle weights is zero
-        if np.sum(weights) == 0:
-            raise ValueError("The sum of the particle weights is zero. Check the weight update step.")
-
-        # Effective number of particles
+        # Calculate the number of effective particles
         N_eff = 1.0 / np.sum(weights ** 2)
 
         # Resample particles if the effective number of particles is less than half of the total number of particles
-        if N_eff < len(self.particles) / 2:
-            self.particles = self.__systematic_resample()
+        if N_eff < NUM_PARTICLES / 2:
+            print('RESAMPLING')
+            self.__low_variance_resample(weights)
 
         # Return the estimated position of the robot
         return self.__estimate_robot_position()
@@ -140,19 +135,61 @@ class FastSLAM2:
             p.x += d_lin * np.cos(p.yaw)
             p.y += d_lin * np.sin(p.yaw)
 
-    def __systematic_resample(self):
+
+    def __get_normalized_weights(self):
+        """
+        Normalizes the weights of all particles.
+        :return: Returns the normalized weights as a Nx2 array
+        """
+        total_weight = sum(p.weight for p in self.particles)
+        if total_weight > 1e-10:
+            for p in self.particles:
+                p.weight = 1.0 / NUM_PARTICLES
+        else:
+            for p in self.particles:
+                p.weight /= total_weight
+
+        return np.array([particle.weight for particle in self.particles])
+
+    def __low_variance_resample(self, weights: ndarray):
+        """
+        Resample particles with low variance resampling.
+        :param weights: The normalized weights of the particles
+        :return:
+        """
+        # Create a list to store the new particles
+        new_particles = []
+
+        # Get random starting point
+        rand_starting_point = np.random.uniform(0, 1 / NUM_PARTICLES)
+
+        # Get index of the first particle
+        particle_weight = weights[0]
+        particle_index = 0
+
+        # Calculate the step size
+        step = 1 / NUM_PARTICLES
+
+        # Resample particles
+        for m in range(NUM_PARTICLES):
+            u = rand_starting_point + m * step
+            while u > particle_weight and particle_index < NUM_PARTICLES:
+                particle_index += 1
+                particle_weight += weights[particle_index]
+            new_particles.append(self.particles[particle_index])
+
+        # Update the particles
+        self.particles = new_particles
+        print('Resampled particles:', len(self.particles))
+
+    def __systematic_resample(self, weights: ndarray) -> list[Particle]:
         """
         Perform systematic resampling of the particles.
+        :param weights: The normalized weights of the particles
         :return: Returns the resampled particles
         """
-        num_particles = len(self.particles)
-
-        # Normalisierung der Gewichte
-        weights = np.array([particle.weight for particle in self.particles])
-        weights /= np.sum(weights)  # Normalisierung der Gewichte
-
         # Resampling
-        positions = (np.arange(num_particles) + np.random.rand()) / num_particles
+        positions = (np.arange(NUM_PARTICLES) + np.random.rand()) / NUM_PARTICLES
         cumulative_sum = np.cumsum(weights)
 
         # Resampling mit Indices
@@ -160,6 +197,7 @@ class FastSLAM2:
 
         # Erstellen der neuen Partikel basierend auf den Indizes
         resampled_particles = [self.particles[i] for i in indices]
+        print('Resampled particles:', len(resampled_particles))
 
         return resampled_particles
 
