@@ -1,5 +1,7 @@
-﻿import math
+﻿import concurrent
+import math
 import random
+from concurrent.futures import ThreadPoolExecutor, wait
 from copy import deepcopy
 
 import numpy as np
@@ -40,68 +42,13 @@ class FastSLAM2:
         # Update particle poses
         self.__move_particles(d_lin, rotation)
 
-        # Update particles (landmarks and weights)
+        # Update particles (landmarks and weights) in extra threads to speed up the process
         for measurement in measurements:
-            for particle in self.particles:
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = [executor.submit(self.__update_particle, particle, measurement) for particle in
+                           self.particles]
+                wait(futures)
 
-                # Search for the associated landmark by the landmark ID of the measurement
-                associated_landmark, associated_landmark_index = particle.get_landmark(measurement.landmark_id)
-
-                # If no associated landmark is found, the measurement is referencing to a new landmark
-                # and the new landmark will be added to the particle map
-                if associated_landmark is None or associated_landmark_index is None:
-                    landmark_x = particle.x + measurement.distance * math.cos(particle.yaw + measurement.yaw)
-                    landmark_y = particle.y + measurement.distance * math.sin(particle.yaw + measurement.yaw)
-                    particle.landmarks.append(Landmark(measurement.landmark_id, landmark_x, landmark_y))
-
-                # If an associated landmark is found, the particle's map will be updated based on the actual measurement
-                else:
-                    # Calculate the predicted measurement of the particle and the associated landmark
-                    dx = associated_landmark.x - particle.x
-                    dy = associated_landmark.y - particle.y
-                    q = dx ** 2 + dy ** 2
-                    distance = math.sqrt(q)
-                    angle = np.arctan2(dy, dx) - particle.yaw
-                    predicted_measurement = np.array([distance, angle])
-
-                    # Calculate the innovation which is the difference between the actual measurement and the predicted measurement
-                    innovation = measurement.as_vector() - predicted_measurement
-                    innovation[1] = (innovation[1] + np.pi) % (2 * np.pi) - np.pi  # Ensure angle is between -pi and pi
-
-                    # Calculate the Jacobian matrix of the particle and the associated landmark.
-                    # Jacobian describes how changes in the state of the robot influence the measured observations.
-                    # It helps to link the uncertainties in the estimates with the uncertainties in the measurements
-                    jacobian = np.array([
-                        [dx / distance, dy / distance],
-                        [-dy / q, dx / q]
-                    ])
-
-                    # Calculate the covariance of the observation which depends on the Jacobian matrix,
-                    # the covariance of the landmark and the measurement noise
-                    observation_cov = jacobian @ associated_landmark.cov @ jacobian.T + MEASUREMENT_NOISE
-
-                    # Calculate the Kalman gain which is used to update the pose/mean and covariance of the associated landmark.
-                    # It determines how much the actual measurement should be trusted compared to the predicted measurement.
-                    # Thus, it determines how much the landmark should be updated based on the actual measurement.
-                    kalman_gain = associated_landmark.cov @ jacobian.T @ np.linalg.inv(observation_cov)
-
-                    # Calculate updated pose/mean and covariance of the associated landmark
-                    mean = associated_landmark.as_vector() + kalman_gain @ innovation
-                    cov = (np.eye(len(associated_landmark.cov)) - kalman_gain @ jacobian) @ associated_landmark.cov
-
-                    # Update the associated landmark
-                    particle.landmarks[associated_landmark_index] = Landmark(
-                        identifier=associated_landmark.id,
-                        x=float(mean[0]),
-                        y=float(mean[1]),
-                        cov=cov
-                    )
-
-                    # Calculate the likelihood with the multivariate normal distribution
-                    likelihood = multivariate_normal.pdf(innovation, mean=np.zeros(len(innovation)), cov=observation_cov)
-
-                    # Update the particle weight with the likelihood
-                    particle.weight *= likelihood
 
         # Normalize weights and resample particles
         self.__normalize_weights()
@@ -132,6 +79,65 @@ class FastSLAM2:
             p.x += d_lin * np.cos(p.yaw)
             p.y += d_lin * np.sin(p.yaw)
 
+    def __update_particle(self, particle: Particle, measurement: Measurement):
+        # Search for the associated landmark by the landmark ID of the measurement
+        associated_landmark, associated_landmark_index = particle.get_landmark(measurement.landmark_id)
+
+        # If no associated landmark is found, the measurement is referencing to a new landmark
+        # and the new landmark will be added to the particle map
+        if associated_landmark is None or associated_landmark_index is None:
+            landmark_x = particle.x + measurement.distance * math.cos(particle.yaw + measurement.yaw)
+            landmark_y = particle.y + measurement.distance * math.sin(particle.yaw + measurement.yaw)
+            particle.landmarks.append(Landmark(measurement.landmark_id, landmark_x, landmark_y))
+
+        # If an associated landmark is found, the particle's map will be updated based on the actual measurement
+        else:
+            # Calculate the predicted measurement of the particle and the associated landmark
+            dx = associated_landmark.x - particle.x
+            dy = associated_landmark.y - particle.y
+            q = dx ** 2 + dy ** 2
+            distance = math.sqrt(q)
+            angle = np.arctan2(dy, dx) - particle.yaw
+            predicted_measurement = np.array([distance, angle])
+
+            # Calculate the innovation which is the difference between the actual measurement and the predicted measurement
+            innovation = measurement.as_vector() - predicted_measurement
+            innovation[1] = (innovation[1] + np.pi) % (2 * np.pi) - np.pi  # Ensure angle is between -pi and pi
+
+            # Calculate the Jacobian matrix of the particle and the associated landmark.
+            # Jacobian describes how changes in the state of the robot influence the measured observations.
+            # It helps to link the uncertainties in the estimates with the uncertainties in the measurements
+            jacobian = np.array([
+                [dx / distance, dy / distance],
+                [-dy / q, dx / q]
+            ])
+
+            # Calculate the covariance of the observation which depends on the Jacobian matrix,
+            # the covariance of the landmark and the measurement noise
+            observation_cov = jacobian @ associated_landmark.cov @ jacobian.T + MEASUREMENT_NOISE
+
+            # Calculate the Kalman gain which is used to update the pose/mean and covariance of the associated landmark.
+            # It determines how much the actual measurement should be trusted compared to the predicted measurement.
+            # Thus, it determines how much the landmark should be updated based on the actual measurement.
+            kalman_gain = associated_landmark.cov @ jacobian.T @ np.linalg.inv(observation_cov)
+
+            # Calculate updated pose/mean and covariance of the associated landmark
+            mean = associated_landmark.as_vector() + kalman_gain @ innovation
+            cov = (np.eye(len(associated_landmark.cov)) - kalman_gain @ jacobian) @ associated_landmark.cov
+
+            # Update the associated landmark
+            particle.landmarks[associated_landmark_index] = Landmark(
+                identifier=associated_landmark.id,
+                x=float(mean[0]),
+                y=float(mean[1]),
+                cov=cov
+            )
+
+            # Calculate the likelihood with the multivariate normal distribution
+            likelihood = multivariate_normal.pdf(innovation, mean=np.zeros(len(innovation)), cov=observation_cov)
+
+            # Update the particle weight with the likelihood
+            particle.weight *= likelihood
 
     def __normalize_weights(self):
         """
