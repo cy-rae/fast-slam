@@ -137,8 +137,5 @@ class LandmarkUtils:
         # Filter the observed landmarks which are not already known
         new_landmarks = [landmark for landmark in observed_landmarks if landmark.id not in known_landmark_ids]
 
-        for landmark in new_landmarks:
-            print(landmark)
-
         # Extend the list of known landmarks with the new landmarks
         LandmarkUtils.known_landmarks.extend(new_landmarks)

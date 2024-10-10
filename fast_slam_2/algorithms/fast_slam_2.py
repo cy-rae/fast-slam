@@ -104,7 +104,8 @@ class FastSLAM2:
 
         # Normalize weights and resample particles
         total_weight = sum(particle.weight for particle in self.particles)
-        if total_weight > 0:
+        print('Total weight:', total_weight)
+        if total_weight > 1e-10:
             for particle in self.particles:
                 particle.weight /= total_weight
 
