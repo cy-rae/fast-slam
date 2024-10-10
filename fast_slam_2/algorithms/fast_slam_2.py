@@ -177,7 +177,6 @@ class FastSLAM2:
 
         # Update the particles
         self.particles = new_particles
-        print('Resampled particles:', len(self.particles))
 
     def __systematic_resample(self, weights: ndarray) -> list[Particle]:
         """
@@ -208,7 +207,6 @@ class FastSLAM2:
         y_mean = 0.0
         yaw_mean = 0.0
         total_weight = sum(p.weight for p in self.particles)
-        # print(total_weight)
 
         # Calculate the mean of the particles
         for p in self.particles:
