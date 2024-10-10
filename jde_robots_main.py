@@ -26,8 +26,8 @@ while True:
     scanned_points: ndarray = robot.scan_environment()
 
     # Get the translation and rotation of the robot using ICP based on the scanned points and the previous points that the robot has saved.
-    # d_lin, d_ang = robot.get_displacement(v, w)
-    d_lin, d_ang = robot.get_odometry(v, w)
+    d_lin, d_ang = robot.get_displacement(v, w)
+    # d_lin, d_ang = robot.get_odometry(v, w)
 
     # Search for landmarks in the scanned points using line filter and hough transformation and get the measurements to them
     measurement_list: list[Measurement] = LandmarkUtils.get_measurements_to_landmarks(scanned_points)
