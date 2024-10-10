@@ -112,7 +112,7 @@ class FastSLAM2:
         # Resample particles if the effective number of particles is less than half of the total number of particles
         if num_effective_particles < NUM_PARTICLES / 2:
             print('RESAMPLING')
-            self.__low_variance_resample(weights)
+            self.__low_variance_resample()
 
         # Return the estimated position of the robot
         return self.__estimate_robot_position()
@@ -174,24 +174,6 @@ class FastSLAM2:
 
         # Update the particles
         self.particles = new_particles
-
-    def __systematic_resample(self, weights: ndarray) -> list[Particle]:
-        """
-        Perform systematic resampling of the particles.
-        :param weights: The normalized weights of the particles
-        :return: Returns the resampled particles
-        """
-        # Resampling
-        positions = (np.arange(NUM_PARTICLES) + np.random.rand()) / NUM_PARTICLES
-        cumulative_sum = np.cumsum(weights)
-
-        # Resampling mit Indices
-        indices = np.searchsorted(cumulative_sum, positions)
-
-        # Erstellen der neuen Partikel basierend auf den Indizes
-        resampled_particles = [self.particles[i] for i in indices]
-
-        return resampled_particles
 
     def __estimate_robot_position(self) -> tuple[float, float, float]:
         """
