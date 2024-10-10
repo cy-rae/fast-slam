@@ -135,7 +135,7 @@ class Robot(DirectedPoint):
 
         return d_lin, d_ang
 
-    def get_odometry(self) -> tuple[float, float]:
+    def get_odometry(self, v: float, w: float) -> tuple[float, float]:
         """
         Get the linear and angular displacement of the robot based on the linear and angular velocity.
         :return: Returns the linear and angular displacement of the robot as a tuple (d_lin, d_ang)
@@ -157,5 +157,10 @@ class Robot(DirectedPoint):
         self.__prev_x = curr_x
         self.__prev_y = curr_y
         self.__prev_yaw = curr_yaw
+
+        if v == 0:
+            d_lin = 0
+        if w == 0:
+            d_ang = 0
 
         return d_lin, d_ang
