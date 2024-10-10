@@ -1,11 +1,8 @@
-﻿import concurrent
-import math
-import random
+﻿import math
 from concurrent.futures import ThreadPoolExecutor, wait
 from copy import deepcopy
 
 import numpy as np
-from numpy import ndarray
 from scipy.stats import multivariate_normal
 
 from fast_slam_2.config import NUM_PARTICLES, TRANSLATION_NOISE, ROTATION_NOISE, MEASUREMENT_NOISE
