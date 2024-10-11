@@ -98,11 +98,11 @@ class Robot(DirectedPoint):
         # Update the previous points with the target points for the next iteration
         self.__prev_points = target_points
 
-        # Compute the linear distance the robot has moved
-        d_linear = np.linalg.norm(translation_vector)
-
         # Covert the rotation matrix to an angle in radians
         rotation = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+
+        # Compute the linear distance the robot has moved
+        d_linear = np.linalg.norm(translation_vector)
 
         return rotation, d_linear
 
@@ -120,11 +120,11 @@ class Robot(DirectedPoint):
         # Update the previous points with the target points for the next iteration
         self.__prev_points = target_points
 
-        # Compute the linear distance the robot has moved
-        d_linear = np.linalg.norm(translation_vector)
-
         # Covert the rotation matrix to an angle in radians
         rotation = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+
+        # Compute the linear distance the robot has moved
+        d_linear = np.linalg.norm(translation_vector)
 
         return rotation, d_linear
 
@@ -142,11 +142,11 @@ class Robot(DirectedPoint):
         # Update the previous points with the target points for the next iteration
         self.__prev_points = target_points
 
-        # Compute the linear distance the robot has moved
-        d_linear = np.linalg.norm(translation_vector)
-
         # Covert the rotation matrix to an angle in radians
         rotation = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+
+        # Compute the linear distance the robot has moved
+        d_linear = np.linalg.norm(translation_vector)
 
         return rotation, d_linear
 
@@ -168,7 +168,7 @@ class Robot(DirectedPoint):
         self.__prev_timestamp = curr_timestamp
 
         # Calculate the linear and angular displacement of the robot
-        d_lin = v * dt / 2
         d_ang = w * dt
+        d_lin = v * dt / 2
 
-        return d_lin, d_ang
+        return d_ang, d_lin
