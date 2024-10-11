@@ -92,6 +92,9 @@ class Robot(DirectedPoint):
         :param w: The angular velocity of the robot
         :return: Returns the rotation in radians and translation vector
         """
+        # Set the current position to avoid false positive results due to time difference
+        EvaluationUtils.set_actual_pos()
+
         # Get the rotation matrix and translation vector between the previous and target points using ICP
         rotation_matrix, translation_vector = ICP.run(self.__prev_points, target_points)
 
@@ -114,6 +117,9 @@ class Robot(DirectedPoint):
         :param w: The angular velocity of the robot
         :return: Returns the rotation in radians and translation vector
         """
+        # Set the current position to avoid false positive results due to time difference
+        EvaluationUtils.set_actual_pos()
+
         # Get the rotation matrix and translation vector between the previous and target points using ICP
         rotation_matrix, translation_vector = ICP.best_fit_transform(self.__prev_points, target_points)
 
@@ -136,6 +142,9 @@ class Robot(DirectedPoint):
         :param w: The angular velocity of the robot
         :return: Returns the rotation in radians and translation vector
         """
+        # Set the current position to avoid false positive results due to time difference
+        EvaluationUtils.set_actual_pos()
+
         # Get the rotation matrix and translation vector between the previous and target points using ICP
         rotation_matrix, translation_vector = ICP.get_transformation(self.__prev_points, target_points)
 
