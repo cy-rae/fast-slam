@@ -36,8 +36,10 @@ class FastSLAM2:
         :param rotation: The rotation angle of the robot in radians
         :param measurements: List of measurements to observed landmarks (distances and angles of landmark to robot and landmark ID)
         """
-        # Update particle poses
-        self.__move_particles(d_lin, rotation)
+        # Move particles in extra threads to speed up the process
+        with ThreadPoolExecutor(max_workers=NUM_CORES) as executor:
+            futures = [executor.submit(self.__move_particle, i, d_lin, rotation) for i in range(NUM_PARTICLES)]
+            wait(futures)
 
         # Update particles (landmarks and weights) in extra threads to speed up the process
         for measurement in measurements:
@@ -61,20 +63,20 @@ class FastSLAM2:
         # Return the estimated position of the robot
         return self.__estimate_robot_position()
 
-    def __move_particles(self, d_lin: float, rotation: float):
+    def __move_particle(self, index: int, d_lin: float, rotation: float):
         """
-        Update the poses of the particles based on the passed translation vector and rotation.
+        Update the particle (determined by the passed index) based on the passed translation vector and rotation.
+        :param index: The index of the particle in the particle list
         :param d_lin: The translation vector of the robot
         :param rotation: The rotation angle of the robot in radians
         """
-        for p in self.particles:
-            # Apply uncertainty to the movement of the robot and particles using random Gaussian noise with the standard deviations
-            d_lin += np.random.normal(0, TRANSLATION_NOISE)
-            rotation += np.random.normal(0, ROTATION_NOISE)
+        # Apply uncertainty to the movement of the robot and particles using random Gaussian noise with the standard deviations
+        d_lin += np.random.normal(0, TRANSLATION_NOISE)
+        rotation += np.random.normal(0, ROTATION_NOISE)
 
-            p.yaw = (p.yaw + rotation + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
-            p.x += d_lin * np.cos(p.yaw)
-            p.y += d_lin * np.sin(p.yaw)
+        self.particles[index].yaw = (self.particles[index].yaw + rotation + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
+        self.particles[index].x += d_lin * np.cos(self.particles[index].yaw)
+        self.particles[index].y += d_lin * np.sin(self.particles[index].yaw)
 
     def __update_particle(self, particle: Particle, measurement: Measurement):
         # Search for the associated landmark by the landmark ID of the measurement
