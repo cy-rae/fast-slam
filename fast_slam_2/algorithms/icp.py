@@ -1,77 +1,53 @@
-﻿from copy import deepcopy
-
-import numpy as np
-from numpy import ndarray
+﻿import numpy as np
 from scipy.spatial import KDTree
 
 
 class ICP:
     @staticmethod
-    def run(
-            source_points: ndarray,
-            target_points: ndarray,
-            max_iterations=300,
-            tolerance=1e-6
-    ) -> tuple[ndarray, ndarray]:
+    def get_transformation(
+            source_points: np.ndarray,
+            target_points: np.ndarray,
+            max_iterations=100,
+            threshold=1e-5
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Iterative closest point algorithm for 2D point clouds to find the optimal rotation and translation between them.
+        Compute the best fitting rotation matrix and translation vector that aligns the source points to the target points.
         :param source_points: Nx2 array of source points
         :param target_points: Nx2 array of target points
-        :param max_iterations: Maximum number of iterations
-        :param tolerance: Tolerance for convergence
-        :return: Returns the rotation in radians and translation vector
+        :param max_iterations: Maximum number of iterations. Default is 100
+        :param threshold: Tolerance threshold for convergence. Default is 1e-5.
         """
-        # Initial transformation with identity matrix and zero vector
-        translation_vector = np.zeros((2,))
-        rotation_matrix = np.eye(2)
+        # Initialize the previous error to a large value to ensure the loop runs at least once
+        prev_error = float('inf')
 
-        for _ in range(max_iterations):
-            # Apply the current transformation to source points
-            transformed_points = np.dot(source_points, rotation_matrix.T) + translation_vector
+        # Initialize the rotation matrix and translation vector
+        total_rotation = np.eye(2)
+        total_translation = np.zeros((2,))
 
-            # Find nearest neighbors in target point cloud
+        for i in range(max_iterations):
+            # Get the nearest neighbors in the target point cloud
             tree = KDTree(target_points)
-            _, indices = tree.query(transformed_points)
+            distances, indices = tree.query(source_points)
 
-            # Corresponding points from target
-            matched_points = target_points[indices]
-            matched_points = matched_points.reshape(-1, 2)  # Reshape to Nx2 array
+            # Calculate the transformation between the source and target points
+            rotation, translation = ICP.best_fit_transform(source_points, target_points[indices])
 
-            # Compute centroids of both point sets
-            source_centroid = np.mean(source_points, axis=0)
-            target_centroid = np.mean(matched_points, axis=0)
+            # Apply the transformation to the source points
+            source_points = np.dot(source_points, rotation.T) + translation
 
-            # Center the points around the centroids
-            source_centered = source_points - source_centroid
-            target_centered = matched_points - target_centroid
+            # Update the overall transformation (combining rotations and translations)
+            total_rotation = np.dot(rotation, total_rotation)
+            total_translation = np.dot(rotation, total_translation) + translation
 
-            # Compute covariance matrix
-            cov = np.dot(source_centered.T, target_centered)
-
-            # Singular Value Decomposition (SVD)
-            U, _, Vt = np.linalg.svd(cov)
-
-            # Compute optimal rotation
-            new_rotation_matrix = np.dot(U, Vt)
-
-            # Ensure it's a proper rotation (det(rotation_matrix) = 1)
-            if np.linalg.det(new_rotation_matrix) < 0:
-                Vt[1, :] *= -1
-                new_rotation_matrix = np.dot(U, Vt)
-
-            # Compute optimal translation
-            new_translation_vector = target_centroid - np.dot(source_centroid, new_rotation_matrix.T)
-
-            # Check for convergence
-            if np.linalg.norm(new_rotation_matrix - rotation_matrix) < tolerance and np.linalg.norm(
-                    new_translation_vector - translation_vector) < tolerance:
+            # Calculate the mean error and break the loop if the error is less than the threshold
+            mean_error = np.mean(distances)
+            if np.abs(prev_error - mean_error) < threshold:
                 break
 
-            # Update transformation
-            translation_vector = new_translation_vector
-            rotation_matrix = new_rotation_matrix
+            # Set previous error for next iteration
+            prev_error = mean_error
 
-        return rotation_matrix, translation_vector
+        return total_rotation, total_translation
 
     @staticmethod
     def best_fit_transform(source_points, target_points):
@@ -102,51 +78,6 @@ class ICP:
             rotation_matrix = np.dot(Vt.T, U.T)
 
         # Compute the translation vector
-        t = centroid_target - np.dot(rotation_matrix, centroid_source)
-
-        return rotation_matrix, t
-
-    @staticmethod
-    def get_transformation(
-            source_points: ndarray,
-            target_points: ndarray,
-            max_iterations=100,
-            threshold=1e-5
-    ) -> tuple[ndarray, ndarray]:
-        """
-        Compute the best fitting rotation matrix and translation vector that aligns the source points to the target points.
-        :param source_points: Nx2 array of source points
-        :param target_points: Nx2 array of target points
-        :param max_iterations: Maximum number of iterations. Default is 50
-        :param threshold: Tolerance threshold for convergence. Default is 1e-5.
-        """
-        # Initialize the previous error to a large value to ensure the loop runs at least once
-        prev_error = 1
-
-        # Initialize the rotation matrix and translation vector
-        rotation_matrix = np.eye(2)
-        translation_vector = np.zeros((2,))
-
-        for _ in range(max_iterations):
-            # Get the nearest neighbors in the target point cloud
-            tree = KDTree(target_points)
-            distances, indices = tree.query(source_points)
-
-            # Calculate the transformation between the source and target points
-            r, t = ICP.best_fit_transform(source_points, target_points[indices])
-            rotation_matrix += r
-            translation_vector += t
-
-            # Apply the transformation to the source points
-            source_points = np.dot(source_points, rotation_matrix.T) + translation_vector
-
-            # Calculate the mean error and break the loop if the error is less than the threshold
-            mean_error = np.mean(distances)
-            if np.abs(prev_error - mean_error) < threshold:
-                break
-
-            # Set previous error for next iteration
-            prev_error = mean_error
+        translation_vector = centroid_target - np.dot(rotation_matrix, centroid_source)
 
         return rotation_matrix, translation_vector
-

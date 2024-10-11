@@ -5,7 +5,6 @@ import numpy as np
 from numpy import ndarray
 
 from fast_slam_2.algorithms.icp import ICP
-from fast_slam_2.config import TRANSLATION_NOISE, ROTATION_NOISE
 from fast_slam_2.models.directed_point import DirectedPoint
 from fast_slam_2.utils.evaluation_utils import EvaluationUtils
 
@@ -41,8 +40,14 @@ class Robot(DirectedPoint):
             dist = laser_data.values[i]
 
             # If the distance is less than the minimum range or greater than the maximum range, skip the point
-            if dist < laser_data.minRange or dist > laser_data.maxRange:
-                continue
+            # if dist < laser_data.minRange or dist > laser_data.maxRange:
+            #     continue
+
+            # If the distance is out of range, set it to the minimum or maximum range
+            if dist < laser_data.minRange:
+                dist = laser_data.minRange
+            if dist > laser_data.maxRange:
+                dist = laser_data.maxRange
 
             # The final angle is centered (zeroed) at the front of the robot.
             angle = np.radians(i - 90)
@@ -84,56 +89,6 @@ class Robot(DirectedPoint):
 
         return v, w
 
-    def icp_run(self, target_points: ndarray, v: float, w: float) -> tuple[float, float]:
-        """
-        Get the rotation and translation between the source and target points using the Iterative Closest Point (ICP) algorithm.
-        :param target_points: Nx2 array of target points
-        :param v: The linear velocity of the robot
-        :param w: The angular velocity of the robot
-        :return: Returns the rotation in radians and translation vector
-        """
-        # Set the current position to avoid false positive results due to time difference
-        EvaluationUtils.set_actual_pos()
-
-        # Get the rotation matrix and translation vector between the previous and target points using ICP
-        rotation_matrix, translation_vector = ICP.run(self.__prev_points, target_points)
-
-        # Update the previous points with the target points for the next iteration
-        self.__prev_points = target_points
-
-        # Covert the rotation matrix to an angle in radians
-        rotation = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
-
-        # Compute the linear distance the robot has moved
-        d_linear = np.linalg.norm(translation_vector)
-
-        return rotation, d_linear
-
-    def best_fit_transform(self, target_points: ndarray, v: float, w: float) -> tuple[float, float]:
-        """
-        Get the rotation and translation between the source and target points using the Iterative Closest Point (ICP) algorithm.
-        :param target_points: Nx2 array of target points
-        :param v: The linear velocity of the robot
-        :param w: The angular velocity of the robot
-        :return: Returns the rotation in radians and translation vector
-        """
-        # Set the current position to avoid false positive results due to time difference
-        EvaluationUtils.set_actual_pos()
-
-        # Get the rotation matrix and translation vector between the previous and target points using ICP
-        rotation_matrix, translation_vector = ICP.best_fit_transform(self.__prev_points, target_points)
-
-        # Update the previous points with the target points for the next iteration
-        self.__prev_points = target_points
-
-        # Covert the rotation matrix to an angle in radians
-        rotation = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
-
-        # Compute the linear distance the robot has moved
-        d_linear = np.linalg.norm(translation_vector)
-
-        return rotation, d_linear
-
     def get_transformation(self, target_points: ndarray, v: float, w: float) -> tuple[float, float]:
         """
         Get the rotation and translation between the source and target points using the Iterative Closest Point (ICP) algorithm.
@@ -152,14 +107,20 @@ class Robot(DirectedPoint):
         self.__prev_points = target_points
 
         # Covert the rotation matrix to an angle in radians
-        rotation = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+        rotation = -np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
 
         # Compute the linear distance the robot has moved
         d_linear = np.linalg.norm(translation_vector)
 
+        # Set the linear or angular displacement to 0 if the robot is not moving or rotating
+        if v == 0:
+            d_linear = 0
+        if w == 0:
+            rotation = 0
+
         return rotation, d_linear
 
-    def get_displacement(self, v: int, w: int) -> tuple[float, float]:
+    def get_displacement(self, v: float, w: float) -> tuple[float, float]:
         """
         Get the linear and angular displacement of the robot based on the linear and angular velocity.
         :param v: The linear velocity of the robot
