@@ -86,23 +86,23 @@ class ICP:
         centered_target = target_points - centroid_target
 
         # Compute covariance matrix
-        H = centered_source.T @ centered_target
+        cov = np.dot(centered_source.T, centered_target)
 
         # Singular Value Decomposition (SVD)
-        U, S, Vt = np.linalg.svd(H)
+        U, S, Vt = np.linalg.svd(cov)
 
         # Compute the rotation matrix
-        R = Vt.T @ U.T
+        rotation_matrix = np.dot(Vt.T, U.T)
 
         # Handle reflection case (det(R) should be 1, if det(R) == -1, we correct it)
-        if np.linalg.det(R) < 0:
+        if np.linalg.det(rotation_matrix) < 0:
             Vt[-1, :] *= -1
-            R = Vt.T @ U.T
+            rotation_matrix = np.dot(Vt.T, U.T)
 
         # Compute the translation vector
-        t = centroid_target.T - R @ centroid_source.T
+        t = centroid_target - np.dot(rotation_matrix, centroid_source)
 
-        return R, t
+        return rotation_matrix, t
 
     @staticmethod
     def get_transformation(
@@ -121,57 +121,28 @@ class ICP:
         # Initialize the previous error to a large value to ensure the loop runs at least once
         prev_error = 1
 
-        # Initialize the rotation matrix and translation vector with identity matrix and zero vector
+        # Initialize the rotation matrix and translation vector
         rotation_matrix = np.eye(2)
         translation_vector = np.zeros((2,))
 
         for i in range(max_iterations):
-            # Find the nearest neighbors
-            nearest_neighbors: ndarray = ICP.__find_nearest_neighbors(source_points, target_points)
+            # Get the nearest neighbors in the target point cloud
+            tree = KDTree(target_points)
+            distances, indices = tree.query(source_points)
 
-            # Compute centroids of both point sets
-            source_centroid = np.mean(source_points, axis=0)
-            target_centroid = np.mean(nearest_neighbors, axis=0)
+            # Calculate the transformation between the source and target points
+            rotation_matrix, translation_vector = ICP.best_fit_transform(source_points, target_points[indices])
 
-            # Center the points
-            centered_source = source_points - source_centroid
-            centered_target = nearest_neighbors - target_centroid
+            # Apply the transformation to the source points
+            source_points = np.dot(source_points, rotation_matrix.T) + translation_vector
 
-            # Compute covariance matrix
-            cov = np.dot(centered_source.T, centered_target)
-
-            # Singular Value Decomposition (SVD)
-            U, _, Vt = np.linalg.svd(cov)
-
-            # Compute the rotation matrix
-            rotation_matrix = np.dot(Vt.T, U.T)
-
-            # Compute the translation vector
-            translation_vector = target_centroid - np.dot(source_centroid, rotation_matrix)
-
-            # Transform the source points
-            source_points = np.dot(source_points, rotation_matrix) + translation_vector
-
-            # Check for convergence and break if converged
-            mean_error = np.mean(np.linalg.norm(source_points - nearest_neighbors, axis=1))
+            # Calculate the mean error and break the loop if the error is less than the threshold
+            mean_error = np.mean(distances)
             if np.abs(prev_error - mean_error) < threshold:
                 break
+
+            # Set previous error for next iteration
             prev_error = mean_error
 
         return rotation_matrix, translation_vector
 
-    @staticmethod
-    def __find_nearest_neighbors(source_points: ndarray, target_points: ndarray) -> ndarray:
-        """
-        Find the nearest neighbors in the target point cloud for each source point using KDTree.
-        :param source_points: The source point cloud
-        :param target_points: The target point cloud
-        :return: Returns the indices of the nearest neighbors
-        """
-        # Find nearest neighbors in target point cloud
-        tree = KDTree(target_points)
-        _, indices = tree.query(source_points)
-
-        nearest_neighbors: ndarray = target_points[indices]
-
-        return nearest_neighbors
