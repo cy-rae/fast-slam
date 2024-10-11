@@ -5,7 +5,7 @@ from copy import deepcopy
 import numpy as np
 from scipy.stats import multivariate_normal
 
-from fast_slam_2.config import NUM_PARTICLES, TRANSLATION_NOISE, ROTATION_NOISE, MEASUREMENT_NOISE, NUM_CORES
+# from fast_slam_2.config import NUM_PARTICLES, TRANSLATION_NOISE, ROTATION_NOISE, MEASUREMENT_NOISE, NUM_CORES
 from fast_slam_2.models.landmark import Landmark
 from fast_slam_2.models.measurement import Measurement
 from fast_slam_2.models.particle import Particle
@@ -16,7 +16,7 @@ class FastSLAM2:
     Class that realizes the fast_slam_2 2.0 algorithm.
     """
 
-    def __init__(self):
+    def __init__(self, num_particles: int):
         """
         Initialize the fast_slam_2 2.0 algorithm with the specified number of particles.
         """
@@ -26,10 +26,12 @@ class FastSLAM2:
                 x=0.0,
                 y=0.0,
                 yaw=0.0,
-            ) for _ in range(NUM_PARTICLES)
+            ) for _ in range(num_particles)
         ]
 
-    def iterate(self, d_lin: float, rotation: float, measurements: list[Measurement]):
+    def iterate(self, d_lin: float, rotation: float, measurements: list[Measurement],
+                TRANSLATION_NOISE: float, ROTATION_NOISE: float, MEASUREMENT_NOISE: np.ndarray, NUM_PARTICLES: int, NUM_CORES: int
+                ) -> tuple[float, float, float]:
         """
         Perform one iteration of the fast_slam_2 2.0 algorithm using the passed translation, rotation, and measurements.
         :param d_lin: The translation vector of the robot
@@ -38,32 +40,32 @@ class FastSLAM2:
         """
         # Move particles in extra threads to speed up the process
         with ThreadPoolExecutor(max_workers=NUM_CORES) as executor:
-            futures = [executor.submit(self.__move_particle, i, d_lin, rotation) for i in range(NUM_PARTICLES)]
+            futures = [executor.submit(self.__move_particle, i, d_lin, rotation, TRANSLATION_NOISE, ROTATION_NOISE) for i in range(NUM_PARTICLES)]
             wait(futures)
 
         # Update particles (landmarks and weights) in extra threads to speed up the process
         for measurement in measurements:
             with ThreadPoolExecutor(max_workers=NUM_CORES) as executor:
-                futures = [executor.submit(self.__update_particle, particle, measurement) for particle in
+                futures = [executor.submit(self.__update_particle, particle, measurement, MEASUREMENT_NOISE) for particle in
                            self.particles]
                 wait(futures)
 
 
         # Normalize weights and resample particles
-        self.__normalize_weights()
+        self.__normalize_weights(NUM_PARTICLES)
 
         # Calculate the number of effective particles
-        num_effective_particles = self.__calculate_effective_particles()
+        num_effective_particles = self.__calculate_effective_particles(NUM_PARTICLES)
 
         # Resample particles if the effective number of particles is less than half of the total number of particles
         if num_effective_particles < NUM_PARTICLES / 2:
             print('RESAMPLING')
-            self.__low_variance_resample()
+            self.__low_variance_resample(NUM_PARTICLES)
 
         # Return the estimated position of the robot
         return self.__estimate_robot_position()
 
-    def __move_particle(self, index: int, d_lin: float, rotation: float):
+    def __move_particle(self, index: int, d_lin: float, rotation: float, TRANSLATION_NOISE: float, ROTATION_NOISE: float):
         """
         Update the particle (determined by the passed index) based on the passed translation vector and rotation.
         :param index: The index of the particle in the particle list
@@ -78,7 +80,7 @@ class FastSLAM2:
         self.particles[index].x += d_lin * np.cos(self.particles[index].yaw)
         self.particles[index].y += d_lin * np.sin(self.particles[index].yaw)
 
-    def __update_particle(self, particle: Particle, measurement: Measurement):
+    def __update_particle(self, particle: Particle, measurement: Measurement, MEASUREMENT_NOISE: np.ndarray):
         # Search for the associated landmark by the landmark ID of the measurement
         associated_landmark, associated_landmark_index = particle.get_landmark(measurement.landmark_id)
 
@@ -138,7 +140,7 @@ class FastSLAM2:
             # Update the particle weight with the likelihood
             particle.weight *= likelihood
 
-    def __normalize_weights(self):
+    def __normalize_weights(self, NUM_PARTICLES: int):
         """
         Normalizes the weights of all particles.
         :return: Returns the normalized weights as a Nx2 array
@@ -154,7 +156,7 @@ class FastSLAM2:
 
         return np.array([particle.weight for particle in self.particles])
 
-    def __low_variance_resample(self):
+    def __low_variance_resample(self, NUM_PARTICLES: int):
         """
         Resample particles with low variance resampling.
         :param weights: The normalized weights of the particles
@@ -205,7 +207,7 @@ class FastSLAM2:
 
         return x_mean, y_mean, yaw_mean
 
-    def __calculate_effective_particles(self) -> float:
+    def __calculate_effective_particles(self, NUM_PARTICLES: int) -> float:
         """
         Calculate the effective number of particles.
         If the weight of all particles is equal, the effective number of particles is equal to the total number of particles.
