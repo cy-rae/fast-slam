@@ -1,4 +1,6 @@
-﻿import numpy as np
+﻿from copy import deepcopy
+
+import numpy as np
 from numpy import ndarray
 from scipy.spatial import KDTree
 
@@ -125,13 +127,15 @@ class ICP:
         rotation_matrix = np.eye(2)
         translation_vector = np.zeros((2,))
 
-        for i in range(max_iterations):
+        for _ in range(max_iterations):
             # Get the nearest neighbors in the target point cloud
             tree = KDTree(target_points)
             distances, indices = tree.query(source_points)
 
             # Calculate the transformation between the source and target points
-            rotation_matrix, translation_vector = ICP.best_fit_transform(source_points, target_points[indices])
+            r, t = ICP.best_fit_transform(source_points, target_points[indices])
+            rotation_matrix += r
+            translation_vector += t
 
             # Apply the transformation to the source points
             source_points = np.dot(source_points, rotation_matrix.T) + translation_vector

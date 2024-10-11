@@ -54,7 +54,7 @@ class Robot(DirectedPoint):
         return np.array(scanned_points)
 
     @staticmethod
-    def move(lin_velocity: float, ang_velocity = float) -> tuple[int, int]:
+    def move(lin_velocity: float, ang_velocity: float) -> tuple[float, float]:
         """
         Set the linear and angular velocity of the robot based on the bumper state.
         :return: Returns the linear and angular velocity of the robot
