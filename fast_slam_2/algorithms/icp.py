@@ -69,7 +69,7 @@ class ICP:
             translation_vector = new_translation_vector
             rotation_matrix = new_rotation_matrix
 
-        return translation_vector, rotation_matrix
+        return rotation_matrix, translation_vector
 
     @staticmethod
     def best_fit_transform(source_points, target_points):
@@ -103,3 +103,75 @@ class ICP:
         t = centroid_target.T - R @ centroid_source.T
 
         return R, t
+
+    @staticmethod
+    def get_transformation(
+            source_points: ndarray,
+            target_points: ndarray,
+            max_iterations=50,
+            threshold=1e-5
+    ) -> tuple[ndarray, ndarray]:
+        """
+        Compute the best fitting rotation matrix and translation vector that aligns the source points to the target points.
+        :param source_points: Nx2 array of source points
+        :param target_points: Nx2 array of target points
+        :param max_iterations: Maximum number of iterations. Default is 50
+        :param threshold: Tolerance threshold for convergence. Default is 1e-5.
+        """
+        # Initialize the previous error to a large value to ensure the loop runs at least once
+        prev_error = 1
+
+        # Initialize the rotation matrix and translation vector with identity matrix and zero vector
+        rotation_matrix = np.eye(2)
+        translation_vector = np.zeros((2,))
+
+        for i in range(max_iterations):
+            # Find the nearest neighbors
+            nearest_neighbors: ndarray = ICP.__find_nearest_neighbors(target_points)
+
+            # Compute centroids of both point sets
+            source_centroid = np.mean(source_points, axis=0)
+            target_centroid = np.mean(nearest_neighbors, axis=0)
+
+            # Center the points
+            centered_source = source_points - source_centroid
+            centered_target = nearest_neighbors - target_centroid
+
+            # Compute covariance matrix
+            cov = np.dot(centered_source.T, centered_target)
+
+            # Singular Value Decomposition (SVD)
+            U, _, Vt = np.linalg.svd(cov)
+
+            # Compute the rotation matrix
+            rotation_matrix = np.dot(Vt.T, U.T)
+
+            # Compute the translation vector
+            translation_vector = target_centroid - np.dot(source_centroid, rotation_matrix)
+
+            # Transform the source points
+            source_points = np.dot(source_points, rotation_matrix) + translation_vector
+
+            # Check for convergence and break if converged
+            mean_error = np.mean(np.linalg.norm(source_points - nearest_neighbors, axis=1))
+            if np.abs(prev_error - mean_error) < threshold:
+                break
+            prev_error = mean_error
+
+        return rotation_matrix, translation_vector
+
+    @staticmethod
+    def __find_nearest_neighbors(source_points: ndarray, target_points: ndarray) -> ndarray:
+        """
+        Find the nearest neighbors in the target point cloud for each source point using KDTree.
+        :param source_points: The source point cloud
+        :param target_points: The target point cloud
+        :return: Returns the indices of the nearest neighbors
+        """
+        # Find nearest neighbors in target point cloud
+        tree = KDTree(target_points)
+        _, indices = tree.query(source_points)
+
+        nearest_neighbors: ndarray = target_points[indices]
+
+        return nearest_neighbors

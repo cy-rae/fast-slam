@@ -4,6 +4,7 @@ import HAL
 import numpy as np
 from numpy import ndarray
 
+from fast_slam_2.algorithms.icp import ICP
 from fast_slam_2.config import TRANSLATION_NOISE, ROTATION_NOISE
 from fast_slam_2.models.directed_point import DirectedPoint
 from fast_slam_2.utils.evaluation_utils import EvaluationUtils
@@ -83,36 +84,71 @@ class Robot(DirectedPoint):
 
         return v, w
 
-    # def get_transformation(self, target_points: ndarray, movement: Movement) -> tuple[float, float]:
-    #     """
-    #     Get the rotation and translation between the source and target points using the Iterative Closest Point (ICP) algorithm.
-    #     :param target_points: Nx2 array of target points
-    #     :param movement: The movement of the robot (TRANSLATE or ROTATE)
-    #     :return: Returns the rotation in radians and translation vector
-    #     """
-    #     # Get the rotation matrix and translation vector between the previous and target points using ICP
-    #     # translation_vector, rotation_matrix = ICP.run(self.__prev_points, target_points)
-    #     rotation_matrix, translation_vector = ICP.best_fit_transform(self.__prev_points, target_points)
-    #
-    #     # Update the previous points with the target points for the next iteration
-    #     self.__prev_points = target_points
-    #
-    #     # Depending on the movement of the robot, the translation or rotation should be zero.
-    #     # The roboter either translates or rotates but not both at the same time. The ICP algorithm does not handle this.
-    #     # If the robot translates, the rotation should be zero
-    #     if movement == Movement.TRANSLATE:
-    #         rotation = 0
-    #         # Compute the linear distance the robot has moved
-    #         d_linear = np.linalg.norm(translation_vector)
-    #
-    #     # If the robot rotates, the translation should be zero
-    #     else:
-    #         d_linear = 0
-    #
-    #         # Covert the rotation matrix to an angle in radians
-    #         rotation = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
-    #
-    #     return rotation, d_linear
+    def icp_run(self, target_points: ndarray, v: float, w: float) -> tuple[float, float]:
+        """
+        Get the rotation and translation between the source and target points using the Iterative Closest Point (ICP) algorithm.
+        :param target_points: Nx2 array of target points
+        :param v: The linear velocity of the robot
+        :param w: The angular velocity of the robot
+        :return: Returns the rotation in radians and translation vector
+        """
+        # Get the rotation matrix and translation vector between the previous and target points using ICP
+        rotation_matrix, translation_vector = ICP.run(self.__prev_points, target_points)
+
+        # Update the previous points with the target points for the next iteration
+        self.__prev_points = target_points
+
+        # Compute the linear distance the robot has moved
+        d_linear = np.linalg.norm(translation_vector)
+
+        # Covert the rotation matrix to an angle in radians
+        rotation = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+
+        return rotation, d_linear
+
+    def best_fit_transform(self, target_points: ndarray, v: float, w: float) -> tuple[float, float]:
+        """
+        Get the rotation and translation between the source and target points using the Iterative Closest Point (ICP) algorithm.
+        :param target_points: Nx2 array of target points
+        :param v: The linear velocity of the robot
+        :param w: The angular velocity of the robot
+        :return: Returns the rotation in radians and translation vector
+        """
+        # Get the rotation matrix and translation vector between the previous and target points using ICP
+        rotation_matrix, translation_vector = ICP.best_fit_transform(self.__prev_points, target_points)
+
+        # Update the previous points with the target points for the next iteration
+        self.__prev_points = target_points
+
+        # Compute the linear distance the robot has moved
+        d_linear = np.linalg.norm(translation_vector)
+
+        # Covert the rotation matrix to an angle in radians
+        rotation = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+
+        return rotation, d_linear
+
+    def get_transformation(self, target_points: ndarray, v: float, w: float) -> tuple[float, float]:
+        """
+        Get the rotation and translation between the source and target points using the Iterative Closest Point (ICP) algorithm.
+        :param target_points: Nx2 array of target points
+        :param v: The linear velocity of the robot
+        :param w: The angular velocity of the robot
+        :return: Returns the rotation in radians and translation vector
+        """
+        # Get the rotation matrix and translation vector between the previous and target points using ICP
+        rotation_matrix, translation_vector = ICP.get_transformation(self.__prev_points, target_points)
+
+        # Update the previous points with the target points for the next iteration
+        self.__prev_points = target_points
+
+        # Compute the linear distance the robot has moved
+        d_linear = np.linalg.norm(translation_vector)
+
+        # Covert the rotation matrix to an angle in radians
+        rotation = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+
+        return rotation, d_linear
 
     def get_displacement(self, v: int, w: int) -> tuple[float, float]:
         """
@@ -134,35 +170,5 @@ class Robot(DirectedPoint):
         # Calculate the linear and angular displacement of the robot
         d_lin = v * dt / 2
         d_ang = w * dt
-
-        return d_lin, d_ang
-
-    def get_odometry(self, v: float, w: float) -> tuple[float, float]:
-        """
-        Get the linear and angular displacement of the robot based on the linear and angular velocity.
-        :return: Returns the linear and angular displacement of the robot as a tuple (d_lin, d_ang)
-        """
-        # Get the current pose of the robot
-        curr_x = HAL.getPose3d().x
-        curr_y = HAL.getPose3d().y
-        curr_yaw = HAL.getPose3d().yaw
-
-        # Calculate the linear and angular displacement of the robot
-        d_lin = np.sqrt((curr_x - self.__prev_x) ** 2 + (curr_y - self.__prev_y) ** 2)
-        d_ang = curr_yaw - self.__prev_yaw
-
-        # Add noise to the linear and angular displacement to simulate the odometry noise
-        d_lin += np.random.normal(0, TRANSLATION_NOISE)
-        d_ang += np.random.normal(0, ROTATION_NOISE)
-
-        # Update the previous pose of the robot
-        self.__prev_x = curr_x
-        self.__prev_y = curr_y
-        self.__prev_yaw = curr_yaw
-
-        if v == 0:
-            d_lin = 0
-        if w == 0:
-            d_ang = 0
 
         return d_lin, d_ang
