@@ -108,7 +108,7 @@ class ICP:
     def get_transformation(
             source_points: ndarray,
             target_points: ndarray,
-            max_iterations=50,
+            max_iterations=100,
             threshold=1e-5
     ) -> tuple[ndarray, ndarray]:
         """
