@@ -67,14 +67,8 @@ class LandmarkUtils:
                 min_samples=1  # The number of samples in a neighborhood for a point to be considered as a core point
             )
 
-        # Get the corners which represent the landmarks TODO CHECK WHAT IS BETTER
+        # Get the corners which represent the landmarks
         return LandmarkUtils.__get_corners(intersection_points, filtered_points, threshold=0.1)
-
-        # landmarks: list[Landmark] = []
-        # for intersection_point in intersection_points:
-        #     landmarks.append(Landmark(uuid4(), intersection_point[0], intersection_point[1]))
-        #
-        # return landmarks
 
     @staticmethod
     def __get_corners(
