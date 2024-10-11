@@ -31,7 +31,7 @@ robot = Robot()
 fast_slam = FastSLAM2(NUM_PARTICLES)
 
 # The minimum number of iterations before updating the robot's position based on the estimated position of the particles
-MIN_ITERATIONS = 200000000000000000000000
+MIN_ITERATIONS = 200
 i = 0
 while True:
     # Move the robot
