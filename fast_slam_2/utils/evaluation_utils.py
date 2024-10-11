@@ -77,4 +77,4 @@ class EvaluationUtils:
         angular_deviation = (angular_deviation + np.pi) % (2 * np.pi) - np.pi
 
         # Calculate the deviation percentage for the yaw angle
-        return (abs(angular_deviation) / (2 * np.pi)) * 100  # Times 100 so 100% equals 2pi radians
+        return (abs(angular_deviation) / np.pi) * 100  # Times 100 so 100% equals pi radians (180 degrees)
