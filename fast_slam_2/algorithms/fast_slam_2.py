@@ -5,7 +5,7 @@ from copy import deepcopy
 import numpy as np
 from scipy.stats import multivariate_normal
 
-from fast_slam_2.config import NUM_PARTICLES, TRANSLATION_NOISE, ROTATION_NOISE, MEASUREMENT_NOISE
+from fast_slam_2.config import NUM_PARTICLES, TRANSLATION_NOISE, ROTATION_NOISE, MEASUREMENT_NOISE, NUM_CORES
 from fast_slam_2.models.landmark import Landmark
 from fast_slam_2.models.measurement import Measurement
 from fast_slam_2.models.particle import Particle
@@ -41,7 +41,7 @@ class FastSLAM2:
 
         # Update particles (landmarks and weights) in extra threads to speed up the process
         for measurement in measurements:
-            with ThreadPoolExecutor(max_workers=10) as executor:
+            with ThreadPoolExecutor(max_workers=NUM_CORES) as executor:
                 futures = [executor.submit(self.__update_particle, particle, measurement) for particle in
                            self.particles]
                 wait(futures)
