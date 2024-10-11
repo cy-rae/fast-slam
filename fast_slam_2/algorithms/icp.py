@@ -127,7 +127,7 @@ class ICP:
 
         for i in range(max_iterations):
             # Find the nearest neighbors
-            nearest_neighbors: ndarray = ICP.__find_nearest_neighbors(target_points)
+            nearest_neighbors: ndarray = ICP.__find_nearest_neighbors(source_points, target_points)
 
             # Compute centroids of both point sets
             source_centroid = np.mean(source_points, axis=0)
