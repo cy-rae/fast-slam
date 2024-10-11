@@ -68,12 +68,12 @@ class LandmarkService:
         :return: Returns the detected lines
         """
         # Schritt 4: Kantenextraktion mit Canny
-        edges = cv2.Canny(image, 100, 150, apertureSize=3)
+        # edges = cv2.Canny(image, 100, 150, apertureSize=3)
 
         # Schritt 5: Verwende die Hough-Transformation zur Linienerkennung
-        lines = cv2.HoughLines(edges, 1, np.pi / 180, 75)
+        lines = cv2.HoughLines(image, 1, np.pi / 180, 85)
 
-        return edges, lines
+        return image, lines
 
     @staticmethod
     def __plot_canny_hough_results(image, edges, lines):

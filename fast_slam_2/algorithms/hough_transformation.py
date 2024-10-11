@@ -18,7 +18,7 @@ class HoughTransformation:
         image, width, height = HoughTransformation.__create_hough_transformation_image(points)
 
         # Detect lines using hough transformation
-        lines = HoughTransformation.__detect_lines(image)
+        lines = cv2.HoughLines(image, 1, np.pi / 180, 80)
 
         # Calculate the intersection points. If no intersection points are found, return empty lists
         intersection_points: list[tuple[float, float]] = HoughTransformation.__calculate_intersections(lines, width, height)
@@ -61,23 +61,6 @@ class HoughTransformation:
             cv2.circle(image, center=(x, y), radius=2, color=255, thickness=-1)
 
         return image, width, height
-
-
-    @staticmethod
-    def __detect_lines(image):
-        """
-        Detect lines in the given image using the hough transformation.
-        :param image: The image to detect lines in
-        :return: Returns the detected lines
-        """
-        # Extract edges from the image using the Canny edge detector
-        edges = cv2.Canny(image, 100, 150, apertureSize=3)
-
-        # Use hough transformation to detect lines in the image
-        lines = cv2.HoughLines(edges, 1, np.pi / 180, 75)
-
-        return lines
-
 
     @staticmethod
     def __calculate_intersections(lines, width, height) -> list[tuple[float, float]]:
