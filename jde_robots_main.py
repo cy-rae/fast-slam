@@ -17,7 +17,7 @@ MIN_ITERATIONS = 20000000000000000000000000
 i = 0
 while True:
     # Move the robot
-    v, w = robot.move()
+    v, w = robot.move(0.5, 0.5)
 
     # Scan the environment using the robot's laser data
     scanned_points: ndarray = robot.scan_environment()

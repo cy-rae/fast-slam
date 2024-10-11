@@ -54,7 +54,7 @@ class Robot(DirectedPoint):
         return np.array(scanned_points)
 
     @staticmethod
-    def move() -> tuple[int, int]:
+    def move(lin_velocity: float, ang_velocity = float) -> tuple[int, int]:
         """
         Set the linear and angular velocity of the robot based on the bumper state.
         :return: Returns the linear and angular velocity of the robot
@@ -69,13 +69,13 @@ class Robot(DirectedPoint):
             # If the robot hits the wall, the angular velocity will be set depending on the bumper that was hit
             bumper = HAL.getBumperData().bumper
             if bumper == 0:  # right bumper
-                w = 0.5
+                w = ang_velocity
             else:  # left or center bumper
-                w = -0.5
+                w = -ang_velocity
 
         # If the robot does not hit the wall, the linear and angular velocities will be set to 1 and 0 respectively
         else:
-            v = 0.3
+            v = lin_velocity
             w = 0
 
         # Set the linear and angular velocity of the robot
