@@ -84,7 +84,7 @@ class LandmarkUtils:
         corners: list[Landmark] = []
         for intersection_point in intersection_points:
             for scanned_point in scanned_points:
-                # Calculate eucledeian distance between intersection point and scanned point.
+                # Calculate eucledian distance between intersection point and scanned point.
                 distance = np.sqrt(
                     (intersection_point[0] - scanned_point[0]) ** 2 + (intersection_point[1] - scanned_point[1]) ** 2)
 
