@@ -31,18 +31,19 @@ robot = Robot()
 fast_slam = FastSLAM2(NUM_PARTICLES)
 
 # The minimum number of iterations before updating the robot's position based on the estimated position of the particles
-MIN_ITERATIONS = 200
+MIN_ITERATIONS = 200000000000000000000000
 i = 0
 while True:
     # Move the robot
-    v, w = robot.move(0.35, 0.5)
+    v, w = robot.move(0.6, 0.6)
 
     # Scan the environment using the robot's laser data
     scanned_points: ndarray = robot.scan_environment()
 
     # Get the translation and rotation of the robot using ICP based on the scanned points and the previous points that the robot has saved.
-    d_ang, d_lin = robot.get_displacement(v, w)
+    # d_ang, d_lin = robot.get_displacement(v, w)
     # d_ang, d_lin= robot.get_transformation(scanned_points, v, w)
+    d_ang, d_lin = robot.get_rotation_and_translation(scanned_points, v, w)
 
     # Search for landmarks in the scanned points using line filter and hough transformation and get the measurements to them
     measurement_list: list[Measurement] = LandmarkUtils.get_measurements_to_landmarks(scanned_points)

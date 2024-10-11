@@ -40,14 +40,8 @@ class Robot(DirectedPoint):
             dist = laser_data.values[i]
 
             # If the distance is less than the minimum range or greater than the maximum range, skip the point
-            # if dist < laser_data.minRange or dist > laser_data.maxRange:
-            #     continue
-
-            # If the distance is out of range, set it to the minimum or maximum range
-            if dist < laser_data.minRange:
-                dist = laser_data.minRange
-            if dist > laser_data.maxRange:
-                dist = laser_data.maxRange
+            if dist < laser_data.minRange or dist > laser_data.maxRange:
+                continue
 
             # The final angle is centered (zeroed) at the front of the robot.
             angle = np.radians(i - 90)
@@ -140,5 +134,44 @@ class Robot(DirectedPoint):
         # Calculate the linear and angular displacement of the robot
         d_ang = w * dt
         d_lin = v * dt / 2
+
+        # Set the linear or angular displacement to 0 if the robot is not moving or rotating
+        if v == 0:
+            d_lin = 0
+        if w == 0:
+            d_ang = 0
+
+        return d_ang, d_lin
+
+    def get_rotation_and_translation(self, target_points: ndarray, v: float, w: float) -> tuple[float, float]:
+        """
+        Get the linear displacement of the robot using ICP and the angular displacement based on the angular velocity
+        and time difference.
+        :param target_points: Nx2 array of target points
+        :param v: The linear velocity of the robot
+        :param w: The angular velocity of the robot
+        :return: Returns the linear and angular displacement of the robot as a tuple (d_lin, d_ang)
+        """
+        # Get the difference in time between the current and previous timestamp and update the previous timestamp
+        curr_timestamp: int = HAL.getLaserData().timeStamp
+
+        # Set the current position to avoid false positive results due to time difference
+        EvaluationUtils.set_actual_pos()
+
+        # Calculate the angular displacement of the robot based on the angular velocity and time difference
+        dt: int = curr_timestamp - self.__prev_timestamp
+        self.__prev_timestamp = curr_timestamp
+        d_ang = w * dt
+
+        # Get the translation vector between the previous and target points using ICP
+        _, translation_vector = ICP.get_transformation(self.__prev_points, target_points)
+        self.__prev_points = target_points
+        d_lin = np.linalg.norm(translation_vector)
+
+        # Set the linear or angular displacement to 0 if the robot is not moving or rotating
+        if v == 0:
+            d_lin = 0
+        if w == 0:
+            d_ang = 0
 
         return d_ang, d_lin
