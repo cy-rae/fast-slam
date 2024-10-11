@@ -5,34 +5,40 @@ from fast_slam_2.models.directed_point import DirectedPoint
 
 
 class EvaluationUtils:
+    __actual_pos: DirectedPoint
+
+    @staticmethod
+    def set_actual_pos():
+        """
+        Set the actual position of the robot.
+        """
+        EvaluationUtils.__actual_pos = DirectedPoint(
+            HAL.getPose3d().x + 1,
+            HAL.getPose3d().y - 1.5,
+            HAL.getPose3d().yaw
+        )
+
     @staticmethod
     def evaluate_estimation(estimated_pos: DirectedPoint):
         """
         Evaluate the estimated position of the robot based on the actual position and print the deviation in percentage.
         :param estimated_pos: The estimated position of the robot
         """
-        # Get the actual position of the robot. Apply offset of start position (x=-1, y=1.5) so the robot starts at the origin (0, 0)
-        actual_pos = DirectedPoint(
-            HAL.getPose3d().x + 1,
-            HAL.getPose3d().y - 1.5,
-            HAL.getPose3d().yaw
-        )
-
         # Calculate the deviation of the x coordinate in percentage
-        x_deviation = EvaluationUtils.__calculate_linear_deviation(actual_pos.x, estimated_pos.x)
+        x_deviation = EvaluationUtils.__calculate_linear_deviation(EvaluationUtils.__actual_pos.x, estimated_pos.x)
 
         # Calculate the deviation of the y coordinate in percentage
-        y_deviation = EvaluationUtils.__calculate_linear_deviation(actual_pos.y, estimated_pos.y)
+        y_deviation = EvaluationUtils.__calculate_linear_deviation(EvaluationUtils.__actual_pos.y, estimated_pos.y)
 
         # Calculate the deviation of the yaw angle in percentage
-        angular_deviation = EvaluationUtils.__calculate_angular_deviation(actual_pos.yaw, estimated_pos.yaw)
+        angular_deviation = EvaluationUtils.__calculate_angular_deviation(EvaluationUtils.__actual_pos.yaw, estimated_pos.yaw)
 
         # Calculate the average deviation of the robot in percentage
         average_deviation = (x_deviation + y_deviation + angular_deviation) / 3
 
-        print("\nX", actual_pos.x, estimated_pos.x)
-        print("Y", actual_pos.y, estimated_pos.y)
-        print("Yaw", actual_pos.yaw, estimated_pos.yaw)
+        print("\nX", EvaluationUtils.__actual_pos.x, estimated_pos.x)
+        print("Y", EvaluationUtils.__actual_pos.y, estimated_pos.y)
+        print("Yaw", EvaluationUtils.__actual_pos.yaw, estimated_pos.yaw)
 
         # Print the validation results
         print(f"\nAverage deviation: {average_deviation:.2f}%")

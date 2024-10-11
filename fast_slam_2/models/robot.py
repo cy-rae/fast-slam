@@ -6,6 +6,7 @@ from numpy import ndarray
 
 from fast_slam_2.config import TRANSLATION_NOISE, ROTATION_NOISE
 from fast_slam_2.models.directed_point import DirectedPoint
+from fast_slam_2.utils.evaluation_utils import EvaluationUtils
 
 
 class Robot(DirectedPoint):
@@ -73,7 +74,7 @@ class Robot(DirectedPoint):
 
         # If the robot does not hit the wall, the linear and angular velocities will be set to 1 and 0 respectively
         else:
-            v = 0.5
+            v = 0.3
             w = 0
 
         # Set the linear and angular velocity of the robot
@@ -122,6 +123,11 @@ class Robot(DirectedPoint):
         """
         # Get the difference in time between the current and previous timestamp and update the previous timestamp
         curr_timestamp: int = HAL.getLaserData().timeStamp
+
+        # Set the current position to avoid false positive results due to time difference
+        EvaluationUtils.set_actual_pos()
+
+        # Calculate the time difference between the current and previous timestamp
         dt: int = curr_timestamp - self.__prev_timestamp
         self.__prev_timestamp = curr_timestamp
 
