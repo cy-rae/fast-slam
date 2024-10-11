@@ -4,7 +4,7 @@ import numpy as np
 from numpy import ndarray
 from sklearn.cluster import DBSCAN
 
-class LandmarkService:
+class HoughTransformation:
     __padding: int = 20
     __scale_factor: int = 100
 
@@ -16,19 +16,19 @@ class LandmarkService:
         :return: Returns the extracted landmarks
         """
         # Create hough transformation image
-        image, width, height = LandmarkService.__create_hough_transformation_image(scanned_points)
+        image, width, height = HoughTransformation.__create_hough_transformation_image(scanned_points)
 
         # Detect lines using hough transformation
-        edges, lines = LandmarkService.__hough_line_detection(image)
+        edges, lines = HoughTransformation.__hough_line_detection(image)
 
         # Plot Canny and Hough results
-        LandmarkService.__plot_canny_hough_results(image, edges, lines)
+        HoughTransformation.__plot_canny_hough_results(image, edges, lines)
 
         # Calculate the intersection points and cluster them to prevent multiple points for the same intersection
         # which can happen when multiple lines were detected for the same edge
-        intersection_points = LandmarkService.__calculate_intersections(lines, width, height)
-        intersection_points = LandmarkService.__convert_back_to_original_space(scanned_points, intersection_points)
-        intersection_points = LandmarkService.__cluster_points(intersection_points, 0.5, 1)
+        intersection_points = HoughTransformation.__calculate_intersections(lines, width, height)
+        intersection_points = HoughTransformation.__convert_back_to_original_space(scanned_points, intersection_points)
+        intersection_points = HoughTransformation.__cluster_points(intersection_points, 0.5, 1)
 
         # Convert the intersection points back to the original coordinate space
         return intersection_points
@@ -36,26 +36,26 @@ class LandmarkService:
     @staticmethod
     def __create_hough_transformation_image(scanned_points: np.ndarray):
         # Get the scaled min and max values of the scanned points
-        min_x = int(np.min(scanned_points[:, 0] * LandmarkService.__scale_factor))
-        min_y = int(np.min(scanned_points[:, 1] * LandmarkService.__scale_factor))
-        max_x = int(np.max(scanned_points[:, 0] * LandmarkService.__scale_factor))
-        max_y = int(np.max(scanned_points[:, 1] * LandmarkService.__scale_factor))
+        min_x = int(np.min(scanned_points[:, 0] * HoughTransformation.__scale_factor))
+        min_y = int(np.min(scanned_points[:, 1] * HoughTransformation.__scale_factor))
+        max_x = int(np.max(scanned_points[:, 0] * HoughTransformation.__scale_factor))
+        max_y = int(np.max(scanned_points[:, 1] * HoughTransformation.__scale_factor))
 
         # Calculate the offset to bring all points into the positive coordinate system for the transformation
         offset_x = -min_x if min_x < 0 else 0
         offset_y = -min_y if min_y < 0 else 0
-        offset_x += LandmarkService.__padding  # Apply padding to avoid drawing points at the edge of the image
-        offset_y += LandmarkService.__padding
+        offset_x += HoughTransformation.__padding  # Apply padding to avoid drawing points at the edge of the image
+        offset_y += HoughTransformation.__padding
 
         # Create a new image for the transformation with the offsets
-        width = max_x + offset_x + LandmarkService.__padding
-        height = max_y + offset_y + LandmarkService.__padding
+        width = max_x + offset_x + HoughTransformation.__padding
+        height = max_y + offset_y + HoughTransformation.__padding
         image = np.zeros((height, width), dtype=np.uint8)
 
         # Scale and add the scanned points to the image as circles
         for point in scanned_points:
-            x = int(point[0] * LandmarkService.__scale_factor) + offset_x
-            y = int(point[1] * LandmarkService.__scale_factor) + offset_y
+            x = int(point[0] * HoughTransformation.__scale_factor) + offset_x
+            y = int(point[1] * HoughTransformation.__scale_factor) + offset_y
             cv2.circle(image, center=(x, y), radius=2, color=255, thickness=-1)
 
         return image, width, height
@@ -206,17 +206,17 @@ class LandmarkService:
         original_points: list[tuple[float, float]] = []
 
         # Calculate the offset to move all points into the correct position of the coordinate system
-        min_x = int(np.min(scanned_points[:, 0] * LandmarkService.__scale_factor))
-        min_y = int(np.min(scanned_points[:, 1] * LandmarkService.__scale_factor))
+        min_x = int(np.min(scanned_points[:, 0] * HoughTransformation.__scale_factor))
+        min_y = int(np.min(scanned_points[:, 1] * HoughTransformation.__scale_factor))
         offset_x = -min_x if min_x < 0 else 0
         offset_y = -min_y if min_y < 0 else 0
-        offset_x += LandmarkService.__padding
-        offset_y += LandmarkService.__padding
+        offset_x += HoughTransformation.__padding
+        offset_y += HoughTransformation.__padding
 
         # Calculate the original points
         for x, y in cluster_centers:
-            original_x = (x - offset_x) / LandmarkService.__scale_factor
-            original_y = (y - offset_y) / LandmarkService.__scale_factor
+            original_x = (x - offset_x) / HoughTransformation.__scale_factor
+            original_y = (y - offset_y) / HoughTransformation.__scale_factor
             original_points.append((original_x, original_y))
 
         return original_points
@@ -406,7 +406,7 @@ log = np.array([
 
 # Beispielaufruf
 if __name__ == "__main__":
-    corners = LandmarkService.get_landmarks(log)
+    corners = HoughTransformation.get_landmarks(log)
 
     # Schritt 1: Visualisiere die originalen Punkte
     plt.figure(figsize=(8, 6))
