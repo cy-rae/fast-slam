@@ -25,13 +25,22 @@ class EvaluationUtils:
         :param estimated_pos: The estimated position of the robot
         """
         # Calculate the deviation of the x coordinate in percentage
-        x_deviation = EvaluationUtils.__calculate_linear_deviation(EvaluationUtils.__actual_pos.x, estimated_pos.x)
+        x_deviation = EvaluationUtils.__calculate_linear_deviation(
+            EvaluationUtils.__actual_pos.x,
+            estimated_pos.x
+        )
 
         # Calculate the deviation of the y coordinate in percentage
-        y_deviation = EvaluationUtils.__calculate_linear_deviation(EvaluationUtils.__actual_pos.y, estimated_pos.y)
+        y_deviation = EvaluationUtils.__calculate_linear_deviation(
+            EvaluationUtils.__actual_pos.y,
+            estimated_pos.y
+        )
 
         # Calculate the deviation of the yaw angle in percentage
-        angular_deviation = EvaluationUtils.__calculate_angular_deviation(EvaluationUtils.__actual_pos.yaw, estimated_pos.yaw)
+        angular_deviation = EvaluationUtils.__calculate_angular_deviation(
+            EvaluationUtils.__actual_pos.yaw,
+            estimated_pos.yaw
+        )
 
         # Calculate the average deviation of the robot in percentage
         average_deviation = (x_deviation + y_deviation + angular_deviation) / 3

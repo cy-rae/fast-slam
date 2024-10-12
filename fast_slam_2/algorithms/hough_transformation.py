@@ -21,12 +21,14 @@ class HoughTransformation:
         lines = cv2.HoughLines(image, 1, np.pi / 180, 80)
 
         # Calculate the intersection points. If no intersection points are found, return empty lists
-        intersection_points: list[tuple[float, float]] = HoughTransformation.__calculate_intersections(lines, width, height)
+        intersection_points: list[tuple[float, float]] = HoughTransformation.__calculate_intersections(lines, width,
+                                                                                                       height)
         if len(intersection_points) == 0:
             return []
 
         # Convert the intersection points back to the original coordinate space
-        intersection_points: list[tuple[float, float]] = HoughTransformation.__convert_back_to_original_space(points, intersection_points)
+        intersection_points: list[tuple[float, float]] = HoughTransformation.__convert_back_to_original_space(points,
+                                                                                                              intersection_points)
 
         return intersection_points
 
@@ -107,7 +109,6 @@ class HoughTransformation:
                         intersections.append((x, y))
 
         return intersections
-
 
     @staticmethod
     def __convert_back_to_original_space(scanned_points, cluster_centers):

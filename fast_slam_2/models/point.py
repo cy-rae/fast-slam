@@ -17,7 +17,6 @@ class Point:
         """
         return np.array([self.x, self.y])
 
-
     def to_dict(self):
         return {
             'x': self.x,

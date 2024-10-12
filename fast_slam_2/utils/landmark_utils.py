@@ -1,6 +1,4 @@
-﻿from uuid import uuid4
-
-import numpy as np
+﻿import numpy as np
 from numpy import ndarray
 
 from fast_slam_2.algorithms.hough_transformation import HoughTransformation
@@ -34,7 +32,7 @@ class LandmarkUtils:
         measurements = []
         for landmark in observed_landmarks:
             dist, angle = GeometryUtils.calculate_distance_and_angle(landmark.x, landmark.y)
-            measurements.append(Measurement(landmark.id, dist, angle))
+            measurements.append(Measurement(dist, angle))
 
         return measurements
 
@@ -57,13 +55,19 @@ class LandmarkUtils:
             # which can happen when multiple lines were detected for the same edge
             intersection_points = GeometryUtils.cluster_points(
                 point_lists=intersection_points,
-                eps=0.5,
-                # Maximum distance between two samples  for one to be considered as in the neighborhood of the other
+                eps=0.5,  # Maximum distance between two samples for one to be considered as a part of the other
                 min_samples=1  # The number of samples in a neighborhood for a point to be considered as a core point
             )
 
-        # Get the corners which represent the landmarks
-        return LandmarkUtils.__get_corners(intersection_points, filtered_points, threshold=0.1)
+        # Get the corners which represent the landmarks TODO
+        # return LandmarkUtils.__get_corners(intersection_points, filtered_points, threshold=0.1)
+
+        # Convert the intersection points to landmarks
+        landmarks = []
+        for intersection_point in intersection_points:
+            landmarks.append(Landmark(intersection_point[0], intersection_point[1], np.array([[0.1, 0], [0, 0.1]])))
+
+        return landmarks
 
     @staticmethod
     def __get_corners(
@@ -81,11 +85,12 @@ class LandmarkUtils:
             for scanned_point in scanned_points:
                 # Calculate euclidian distance between intersection point and scanned point.
                 distance = np.sqrt(
-                    (intersection_point[0] - scanned_point[0]) ** 2 + (intersection_point[1] - scanned_point[1]) ** 2)
+                    (intersection_point[0] - scanned_point[0]) ** 2 + (intersection_point[1] - scanned_point[1]) ** 2
+                )
 
                 # If the distance is smaller than the threshold, the intersection point is a corner
                 if distance <= threshold:
-                    corners.append(Landmark(uuid4(), intersection_point[0], intersection_point[1]))
+                    corners.append(Landmark(intersection_point[0], intersection_point[1]))
                     break  # Break the inner loop since the intersection point was already identified as a corner
 
         return corners
@@ -145,4 +150,4 @@ class LandmarkUtils:
         # Update the known landmarks
         LandmarkUtils.known_landmarks = []
         for landmark in clustered_landmarks:
-            LandmarkUtils.known_landmarks.append(Landmark(uuid4(), landmark[0], landmark[1]))
+            LandmarkUtils.known_landmarks.append(Landmark(landmark[0], landmark[1]))

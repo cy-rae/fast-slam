@@ -1,6 +1,4 @@
-﻿import uuid
-
-import numpy as np
+﻿import numpy as np
 
 
 class Measurement:
@@ -8,8 +6,7 @@ class Measurement:
     Class to represent the measurements of an observed landmark (distance and angle in radians).
     """
 
-    def __init__(self, landmark_id: uuid.UUID, distance: float, yaw: float):
-        self.landmark_id: uuid.UUID = landmark_id
+    def __init__(self, distance: float, yaw: float):
         self.distance = distance
         self.yaw = yaw
 

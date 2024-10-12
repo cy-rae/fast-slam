@@ -10,7 +10,6 @@ class DirectedPoint(Point):
         super().__init__(x, y)
         self.yaw = yaw
 
-
     def to_dict(self):
         return {
             'x': self.x,

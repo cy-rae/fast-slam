@@ -81,7 +81,7 @@ class FastSLAM2:
         rotation += np.random.normal(0, ROTATION_NOISE)
 
         self.particles[index].yaw = (self.particles[index].yaw + rotation + np.pi) % (
-                    2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
+                2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
         self.particles[index].x += d_lin * np.cos(self.particles[index].yaw)
         self.particles[index].y += d_lin * np.sin(self.particles[index].yaw)
 
@@ -89,7 +89,6 @@ class FastSLAM2:
     def __update_particle(particle: Particle, measurement: Measurement, MEASUREMENT_NOISE: np.ndarray):
         # Search for the associated landmark by comparing the position of the observation and the particle's landmarks
         observed_landmark = Landmark(
-            measurement.landmark_id,
             measurement.distance * np.cos(measurement.yaw),
             measurement.distance * np.sin(measurement.yaw)
         )
@@ -100,7 +99,7 @@ class FastSLAM2:
         if associated_landmark is None or landmark_index is None:
             landmark_x = particle.x + measurement.distance * math.cos(particle.yaw + measurement.yaw)
             landmark_y = particle.y + measurement.distance * math.sin(particle.yaw + measurement.yaw)
-            particle.landmarks.append(Landmark(measurement.landmark_id, landmark_x, landmark_y))
+            particle.landmarks.append(Landmark(landmark_x, landmark_y))
 
         # If an associated landmark is found, the particle's map will be updated based on the actual measurement
         else:
@@ -139,7 +138,6 @@ class FastSLAM2:
 
             # Update the associated landmark
             particle.landmarks[landmark_index] = Landmark(
-                identifier=associated_landmark.id,
                 x=float(mean[0]),
                 y=float(mean[1]),
                 cov=cov
