@@ -1,8 +1,6 @@
 ﻿import json
 import os
 
-from exceptiongroup import catch
-
 
 class Deserializer:
     """
@@ -11,6 +9,7 @@ class Deserializer:
 
     @staticmethod
     def deserialize(file_path: str) -> tuple[
+        tuple[float, float, float] or None,
         tuple[float, float, float] or None,
         list[tuple[float, float, float]],
         list[tuple[float, float]]
@@ -22,21 +21,28 @@ class Deserializer:
         # Check if file exists
         if not file_path or not os.path.exists(file_path):
             print(f"File {file_path} does not exist.")
-            return None, [], []
+            return None, None, [], []
 
         # Read the JSON data from the file
         with open(file_path, 'r') as file:
             try:
                 json_data: dict = json.load(file)
             except Exception as e:
-                return None, [], []
+                print(f"Error while reading the JSON data: {e}")
+                return None, None, [], []
 
-            robot: tuple[float, float, float] = Deserializer.__deserialize_directed_point(json_data['robot'])
+            estimated_robot_pos: tuple[float, float, float] = Deserializer.__deserialize_directed_point(
+                json_data['estimated_robot_pos']
+            )
+            actual_robot_pos: tuple[float, float, float] = Deserializer.__deserialize_directed_point(
+                json_data['actual_robot_pos']
+            )
             particles: list[tuple[float, float, float]] = Deserializer.__deserialize_directed_points(
-                json_data['particles'])
+                json_data['particles']
+            )
             landmarks: list[tuple[float, float]] = Deserializer.__deserialize_points(json_data['landmarks'])
 
-        return robot, particles, landmarks
+        return estimated_robot_pos, actual_robot_pos, particles, landmarks
 
     @staticmethod
     def __deserialize_directed_point(data: dict) -> tuple[float, float, float]:

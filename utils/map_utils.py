@@ -10,27 +10,39 @@ class MapUtils:
 
     @staticmethod
     def plot_map(
-            robot: tuple[float, float, float],
+            estimated_robot_pos: tuple[float, float, float],
+            actual_robot_pos: tuple[float, float, float],
             particles: list[tuple[float, float, float]],
             landmarks: list[tuple[float, float]]
     ):
         """
         Plot the map with the robot, particles, landmarks and obstacles/borders.
-        :param robot: The robot represented as a tuple (x, y, yaw)
+        :param actual_robot_pos: The actual robot position represented as a tuple (x, y, yaw)
+        :param estimated_robot_pos: The estimated robot position represented as a tuple (x, y, yaw)
         :param particles: The particles represented as a list of tuples (x, y, yaw)
         :param landmarks: The landmarks represented as a list of tuples (x, y)
         """
         try:
             ax: Axes = MapUtils.__init_plot()
 
-            # Plot the robot as a red arrow
+            # Plot the estimated robot position as a red arrow
             MapUtils.__plot_as_arrows(
                 ax,
-                directed_points=[robot],
+                directed_points=[estimated_robot_pos],
                 scale=5,
                 color='red',
-                zorder=3,
+                zorder=4,
                 label='Geschätzte Roboterposition'
+            )
+
+            # Plot the actual robot position as a red arrow
+            MapUtils.__plot_as_arrows(
+                ax,
+                directed_points=[actual_robot_pos],
+                scale=5,
+                color='black',
+                zorder=3,
+                label='Tatsächliche Roboterposition'
             )
 
             # Plot the particles as blue arrows
