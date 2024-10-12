@@ -31,6 +31,11 @@ robot = Robot()
 fast_slam = FastSLAM2(NUM_PARTICLES)
 
 while True:
+    # First initialize the evaluation utils. The process will not start until the robot has fully initialized.
+    if not EvaluationUtils.initialized:
+        EvaluationUtils.try_to_initialize()
+        continue
+
     # Move the robot
     v, w = robot.move(0.3, 0.4)
 
@@ -61,8 +66,8 @@ while True:
     # Update the known landmarks with the observed landmarks
     LandmarkUtils.update_known_landmarks(fast_slam.particles)
 
-    # Serialize the robot, particles, and landmarks to a JSON file and store it in the shared folder
-    Serializer.serialize(robot, fast_slam.particles, LandmarkUtils.known_landmarks)
+    # Evaluate the robot's position based on the actual position
+    results, actual_pos = EvaluationUtils.evaluate_estimation(robot)
 
-    # Validate the robot's position based on the actual position
-    EvaluationUtils.evaluate_estimation(robot)
+    # Serialize the robot, particles, and landmarks to a JSON file and store it in the shared folder
+    Serializer.serialize(robot, actual_pos, fast_slam.particles, LandmarkUtils.known_landmarks, results)
