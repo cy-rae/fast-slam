@@ -9,11 +9,11 @@ from fast_slam_2 import Robot
 from fast_slam_2 import Serializer
 
 # Number of particle
-NUM_PARTICLES = 28
+NUM_PARTICLES = 50
 
 # Translation and rotation noise represent the standard deviation of the translation and rotation.
 # The noise is used to add uncertainty to the movement of the robot and particles.
-TRANSLATION_NOISE = 0.005
+TRANSLATION_NOISE = 0.006
 ROTATION_NOISE = 0.004
 
 # The measurement noise of the Kalman filter depends on the laser's accuracy
@@ -69,6 +69,9 @@ while True:
         robot.x = x
         robot.y = y
         robot.yaw = yaw
+
+    # Update the known landmarks with the observed landmarks
+    LandmarkUtils.update_known_landmarks(fast_slam.particles)
 
     # Serialize the robot, particles, and landmarks to a JSON file and store it in the shared folder
     Serializer.serialize(robot, fast_slam.particles, LandmarkUtils.known_landmarks)

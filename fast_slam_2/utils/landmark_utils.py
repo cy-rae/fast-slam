@@ -8,6 +8,7 @@ from fast_slam_2.algorithms.line_filter import LineFilter
 from fast_slam_2.config import MAXIMUM_LANDMARK_DISTANCE
 from fast_slam_2.models.landmark import Landmark
 from fast_slam_2.models.measurement import Measurement
+from fast_slam_2.models.particle import Particle
 from fast_slam_2.utils.geometry_utils import GeometryUtils
 
 
@@ -29,17 +30,11 @@ class LandmarkUtils:
         # Get the observed landmarks
         observed_landmarks: list[Landmark] = LandmarkUtils.get_observed_landmarks(scanned_points)
 
-        # Associate the observed landmarks with the existing landmarks. The IDs of the landmarks will be updated if a landmark is found.
-        observed_landmarks: list[Landmark] = LandmarkUtils.__associate_landmarks(observed_landmarks)
-
         # Calculate the distance and angle of the corners to the origin (0, 0)
         measurements = []
         for landmark in observed_landmarks:
             dist, angle = GeometryUtils.calculate_distance_and_angle(landmark.x, landmark.y)
             measurements.append(Measurement(landmark.id, dist, angle))
-
-        # Update the known landmarks with the updated landmarks
-        LandmarkUtils.__update_known_landmarks(observed_landmarks)
 
         return measurements
 
@@ -84,7 +79,7 @@ class LandmarkUtils:
         corners: list[Landmark] = []
         for intersection_point in intersection_points:
             for scanned_point in scanned_points:
-                # Calculate eucledian distance between intersection point and scanned point.
+                # Calculate euclidian distance between intersection point and scanned point.
                 distance = np.sqrt(
                     (intersection_point[0] - scanned_point[0]) ** 2 + (intersection_point[1] - scanned_point[1]) ** 2)
 
@@ -96,46 +91,58 @@ class LandmarkUtils:
         return corners
 
     @staticmethod
-    def __associate_landmarks(observed_landmarks: list[Landmark]) -> list[Landmark]:
+    def associate_landmarks(
+            observed_landmark: Landmark,
+            particle_landmarks: list[Landmark]
+    ) -> tuple[Landmark or None, int or None]:
         """
         Search for associated landmarks based on the known landmarks and observed landmarks.
         If a landmark is found, the ID of the landmark will be referenced by the corresponding measurement.
         Else, the measurement will reference to a new landmark.
-        :param observed_landmarks: The observed landmarks as points
-        :return: Returns the updated measurements with the associated landmark IDs
+        :param observed_landmark: The observed landmark as a point
+        :param particle_landmarks: The landmarks of the particle
+        :return: Returns the associated landmark and its index
         """
-        # Search for associated landmarks.
-        # If a landmark is found, the ID of the observed landmark will be overwritten with the ID of the known landmark.
-        for i, observed_landmark in enumerate(observed_landmarks):
-            for known_landmark in LandmarkUtils.known_landmarks:
+        # Search for associated landmarks. Iterating through all landmarks
+        for i, known_landmark in enumerate(particle_landmarks):
+            # Calculate the mahalanobis distance between the observed landmark and the particle's landmark
+            # using the covariance matrix of the particle's landmark
+            distance = GeometryUtils.mahalanobis_distance(
+                known_landmark.as_vector(),
+                observed_landmark.as_vector(),
+                known_landmark.cov
+            )
 
-                # Calculate the mahalanobis distance between the observed landmark and the particle's landmark
-                # using the covariance matrix of the particle's landmark
-                distance = GeometryUtils.mahalanobis_distance(
-                    known_landmark.as_vector(),
-                    observed_landmark.as_vector(),
-                    known_landmark.cov
-                )
+            # If the distance from the observed landmark to an existing landmark is smaller than the threshold,
+            # the landmark ID of the observed landmark will be overwritten with the ID of the associated landmark.
+            if distance < MAXIMUM_LANDMARK_DISTANCE:
+                return known_landmark, i
 
-                # If the distance from the observed landmark to an existing landmark is smaller than the threshold,
-                # the landmark ID of the observed landmark will be overwritten with the ID of the associated landmark.
-                if distance < MAXIMUM_LANDMARK_DISTANCE:
-                    observed_landmarks[i] = Landmark(known_landmark.id, observed_landmark.x, observed_landmark.y)
-                    break
-
-        return observed_landmarks
+        return None, None
 
     @staticmethod
-    def __update_known_landmarks(observed_landmarks: list[Landmark]):
+    def update_known_landmarks(particles: list[Particle]):
         """
-        Update the list of known landmarks with the newly observed landmarks.
-        :param observed_landmarks: The observed landmarks
+        Update the known landmarks by clustering the particle's landmarks
         """
-        # Get the IDs of the known landmarks
-        known_landmark_ids = [landmark.id for landmark in LandmarkUtils.known_landmarks]
+        # Get all landmarks as Nx2 array
+        all_landmarks: list[tuple[float, float]] = []
+        for particle in particles:
+            for landmark in particle.landmarks:
+                all_landmarks.append((landmark.x, landmark.y))
 
-        # Filter the observed landmarks which are not already known
-        new_landmarks = [landmark for landmark in observed_landmarks if landmark.id not in known_landmark_ids]
+        # Get the minimum number of landmarks to determine a cluster which is 70% of the average number of landmarks per particle
+        avg_landmarks = len(all_landmarks) / len(particles)
+        min_samples = int(avg_landmarks * 0.7)
 
-        # Extend the list of known landmarks with the new landmarks
-        LandmarkUtils.known_landmarks.extend(new_landmarks)
+        # Skip clustering if there are not enough landmarks
+        if min_samples < 1:
+            return
+
+        # Cluster the landmarks
+        clustered_landmarks = GeometryUtils.cluster_points(all_landmarks, eps=0.5, min_samples=min_samples)
+
+        # Update the known landmarks
+        LandmarkUtils.known_landmarks = []
+        for landmark in clustered_landmarks:
+            LandmarkUtils.known_landmarks.append(Landmark(uuid4(), landmark[0], landmark[1]))
