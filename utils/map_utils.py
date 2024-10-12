@@ -1,5 +1,6 @@
 ﻿import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.axes import Axes
 
 
 class MapUtils:
@@ -20,13 +21,40 @@ class MapUtils:
         :param landmarks: The landmarks represented as a list of tuples (x, y)
         """
         try:
-            ax = MapUtils.__init_plot()
+            ax: Axes = MapUtils.__init_plot()
 
-            MapUtils.__plot_as_arrows(ax, directed_points=[robot], scale=5,
-                                      color='red', zorder=2)  # Plot the robot as a red arrow
-            MapUtils.__plot_as_arrows(ax, directed_points=particles, scale=5,
-                                      color='blue', zorder=1)  # Plot the particles as blue arrows
-            MapUtils.__plot_as_dots(ax, landmarks, 'g')  # Mark landmarks as green dots
+            # Plot the robot as a red arrow
+            MapUtils.__plot_as_arrows(
+                ax,
+                directed_points=[robot],
+                scale=5,
+                color='red',
+                zorder=3,
+                label='Geschätzte Roboterposition'
+            )
+
+            # Plot the particles as blue arrows
+            MapUtils.__plot_as_arrows(
+                ax,
+                directed_points=particles,
+                scale=5,
+                color='blue',
+                zorder=2,
+                label='Partikel'
+            )
+
+            # Mark landmarks as green dots
+            MapUtils.__plot_as_dots(
+                ax,
+                landmarks,
+                'g',
+                zorder=1,
+                label='Landmarken'
+            )
+
+            # Add the legend below the plot
+            ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
+                      fancybox=True, shadow=True, ncol=1)
 
             # Show the plot
             plt.show()
@@ -51,32 +79,68 @@ class MapUtils:
         ax.set_xlabel('x axis')
         ax.set_ylabel('y axis')
         ax.text(-11, 11, "Map created by the fast_slam_2 2.0 algorithm", fontsize=12, color='black')
-        ax.grid(True) # Show grid
+        ax.grid(True)  # Show grid
 
         return ax
 
     @staticmethod
-    def __plot_as_arrows(ax, directed_points: list[tuple[float, float, float]], scale: float, color: str, zorder: int):
+    def __plot_as_arrows(
+            ax: Axes,
+            directed_points: list[tuple[float, float, float]],
+            scale: float,
+            color: str,
+            zorder: int,
+            label: str or None
+    ):
         """
         Plot the passed directed points as arrows with the passed scale and color.
+        :param ax: The axis to plot the arrows on
         :param directed_points: This list contains all the directed points which will be represented as arrows
         :param scale: The scale of the arrow
         :param color: The color of the arrow
+        :param zorder: The zorder of the arrow that determines the order of the elements in the plot
+        :param label: The label of the arrow that will be shown in the legend
         """
-        for (x, y, yaw) in directed_points:
+        for i, (x, y, yaw) in enumerate(directed_points):
             # Calculate the vector components
             dx = np.cos(yaw)  # x-component
             dy = np.sin(yaw)  # y-component
 
-            # Draw the arrow
-            ax.quiver(x, y, dx, dy, angles='xy', scale_units='inches', scale=scale, color=color, zorder=zorder)
+            # Draw the arrow. Add label only to the first arrow to avoid duplicate entries in the legend
+            if i == 0 and label:
+                ax.quiver(
+                    x, y, dx, dy,
+                    angles='xy', scale_units='inches', scale=scale, color=color, zorder=zorder, label=label
+                )
+            else:
+                ax.quiver(
+                    x, y, dx, dy,
+                    angles='xy', scale_units='inches', scale=scale, color=color, zorder=zorder
+                )
 
     @staticmethod
-    def __plot_as_dots(ax, points: list[tuple[float, float]], color: str):
+    def __plot_as_dots(
+            ax: Axes,
+            points: list[tuple[float, float]],
+            color: str,
+            zorder: int,
+            label: str
+    ):
         """
         Plot the passed points as dots. The color of the dots is determined by the passed color parameter.
+        :param ax: The axis to plot the dots on
         :param points: This list contains all the points which will be represented as dots in the map
         :param color: The color of the dot ('k' -> black, 'g' -> green)
+        :param zorder: The zorder of the dot that determines the order of the elements in the plot
+        :param label: The label of the dot that will be shown in the legend
         """
-        for point in points:
-            ax.plot(point[0], point[1], color + 'o', markersize=5, label='Punkte')
+        if label:
+            ax.plot(
+                [p[0] for p in points], [p[1] for p in points],
+                color + 'o', markersize=5, zorder=zorder, label=label
+            )
+        else:
+            ax.plot(
+                [p[0] for p in points], [p[1] for p in points],
+                color + 'o', markersize=5, zorder=zorder
+            )
