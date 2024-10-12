@@ -13,7 +13,8 @@ class MapUtils:
             estimated_robot_pos: tuple[float, float, float],
             actual_robot_pos: tuple[float, float, float],
             particles: list[tuple[float, float, float]],
-            landmarks: list[tuple[float, float]]
+            landmarks: list[tuple[float, float]],
+            results: dict[str, float or str]
     ):
         """
         Plot the map with the robot, particles, landmarks and obstacles/borders.
@@ -21,9 +22,10 @@ class MapUtils:
         :param estimated_robot_pos: The estimated robot position represented as a tuple (x, y, yaw)
         :param particles: The particles represented as a list of tuples (x, y, yaw)
         :param landmarks: The landmarks represented as a list of tuples (x, y)
+        :param results: The evaluation results represented as a dictionary
         """
         try:
-            ax: Axes = MapUtils.__init_plot()
+            fig, ax = MapUtils.__init_plot()
 
             # Plot the estimated robot position as a red arrow
             MapUtils.__plot_as_arrows(
@@ -68,18 +70,21 @@ class MapUtils:
             ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
                       fancybox=True, shadow=True, ncol=1)
 
+            # Add the results as text under the plot
+            MapUtils.__add_results_text(fig, results)
+
             # Show the plot
             plt.show()
         except Exception as e:
             print(e)
 
     @staticmethod
-    def __init_plot():
+    def __init_plot() -> tuple[plt.Figure, Axes]:
         """
         Initialize the plot
         """
         # Create a figure and axis
-        _, ax = plt.subplots(figsize=(10, 10))
+        fig, ax = plt.subplots(figsize=(10, 10))
 
         # Set limits and labels
         ax.set_xlim([-10, 10])
@@ -93,7 +98,7 @@ class MapUtils:
         ax.text(-11, 11, "Map created by the fast_slam_2 2.0 algorithm", fontsize=12, color='black')
         ax.grid(True)  # Show grid
 
-        return ax
+        return fig, ax
 
     @staticmethod
     def __plot_as_arrows(
@@ -156,3 +161,23 @@ class MapUtils:
                 [p[0] for p in points], [p[1] for p in points],
                 color + 'o', markersize=5, zorder=zorder
             )
+
+    @staticmethod
+    def __add_results_text(fig: plt.Figure, results: dict):
+        """
+        Add the results as text under the plot.
+        :param fig: The figure to add the text to
+        :param results: The results to add as text
+        """
+        fig.text(
+            0.5,
+            -0.1,
+            f"Zeitstempel: {results['timestamp']}\n"
+            f"∅ Gesamtabweichung: {results['average_deviation']}%\n"
+            f"X-Abweichung: {results['x_deviation']}%\n"
+            f"y-Abweichung: {results['y_deviation']}%\n"
+            f"Winkelabweichung: {results['angular_deviation']}%\n"
+            f"Distanz zwischen der tatsächlichen und vorhergesagten Roboterposition: {results['distance']}m",
+            ha='center',
+            fontsize=12
+        )

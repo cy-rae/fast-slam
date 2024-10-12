@@ -12,7 +12,8 @@ class Deserializer:
         tuple[float, float, float] or None,
         tuple[float, float, float] or None,
         list[tuple[float, float, float]],
-        list[tuple[float, float]]
+        list[tuple[float, float]],
+        dict[str, float or str] or None
     ]:
         """
         Deserialize the JSON data into classes.
@@ -21,7 +22,7 @@ class Deserializer:
         # Check if file exists
         if not file_path or not os.path.exists(file_path):
             print(f"File {file_path} does not exist.")
-            return None, None, [], []
+            return None, None, [], [], None
 
         # Read the JSON data from the file
         with open(file_path, 'r') as file:
@@ -29,7 +30,7 @@ class Deserializer:
                 json_data: dict = json.load(file)
             except Exception as e:
                 print(f"Error while reading the JSON data: {e}")
-                return None, None, [], []
+                return None, None, [], [], None
 
             estimated_robot_pos: tuple[float, float, float] = Deserializer.__deserialize_directed_point(
                 json_data['estimated_robot_pos']
@@ -41,8 +42,9 @@ class Deserializer:
                 json_data['particles']
             )
             landmarks: list[tuple[float, float]] = Deserializer.__deserialize_points(json_data['landmarks'])
+            results: dict[str, float or str] = json_data['results']
 
-        return estimated_robot_pos, actual_robot_pos, particles, landmarks
+        return estimated_robot_pos, actual_robot_pos, particles, landmarks, results
 
     @staticmethod
     def __deserialize_directed_point(data: dict) -> tuple[float, float, float]:

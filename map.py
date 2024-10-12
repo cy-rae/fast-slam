@@ -17,12 +17,18 @@ file_path = os.path.join(shared_path, file_name)
 if __name__ == "__main__":
     while True:
         # Deserialize the JSON data that the FastSLAM 2.0 algorithm creates.
-        robot, particles, landmarks = Deserializer.deserialize(file_path)
+        estimated_robot_pos, actual_robot_pos, particles, landmarks, results = Deserializer.deserialize(file_path)
 
         # If the deserialization is successful, plot the map
-        if robot is not None:
+        if estimated_robot_pos is not None:
             # Plot the robot, landmarks, and particles
-            MapUtils.plot_map(robot, particles, landmarks)
+            MapUtils.plot_map(
+                estimated_robot_pos=estimated_robot_pos,
+                actual_robot_pos=actual_robot_pos,
+                particles=particles,
+                landmarks=landmarks,
+                results=results
+            )
 
         # Wait for a second before updating the map
         time.sleep(0.5)

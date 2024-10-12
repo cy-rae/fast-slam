@@ -1,4 +1,6 @@
-﻿import HAL
+﻿from datetime import datetime
+
+import HAL
 import numpy as np
 
 from fast_slam_2.models.directed_point import DirectedPoint
@@ -84,7 +86,9 @@ class EvaluationUtils:
         average_deviation = (x_deviation + y_deviation + angular_deviation) / 3
 
         # Create results object
+        timestamp: str = datetime.now().strftime("%d.%m.%y %H:%M:%S")
         results = EvaluationResults(
+            timestamp,
             round(average_deviation, 2),
             round(x_deviation, 2),
             round(y_deviation, 2),
@@ -98,11 +102,12 @@ class EvaluationUtils:
         print("Yaw", EvaluationUtils.__actual_pos.yaw, estimated_pos.yaw)
 
         # Print the validation results
-        print(f"\nAverage deviation: {results.average_deviation}%")
+        print(f"\nTimestamp: {results.timestamp}%")
+        print(f"Average deviation: {results.average_deviation}%")
         print(f"X deviation: {results.x_deviation}%")
         print(f"Y deviation: {results.y_deviation}%")
         print(f"Angular deviation: {results.angular_deviation}%")
-        print(f"\nDistance between actual and estimated position: {results.distance}%")
+        print(f"Distance between actual and estimated position: {results.distance}%")
 
         return results, EvaluationUtils.__actual_pos
 
