@@ -9,7 +9,7 @@ from fast_slam_2 import Robot
 from fast_slam_2 import Serializer
 
 # Number of particle
-NUM_PARTICLES = 50
+NUM_PARTICLES = 30
 
 # Translation and rotation noise represent the standard deviation of the translation and rotation.
 # The noise is used to add uncertainty to the movement of the robot and particles.
@@ -17,7 +17,7 @@ TRANSLATION_NOISE = 0.006
 ROTATION_NOISE = 0.004
 
 # The measurement noise of the Kalman filter depends on the laser's accuracy
-MEASUREMENT_NOISE = np.array([[0.0015, 0.0], [0.0, 0.0015]])
+MEASUREMENT_NOISE = np.array([[0.0022, 0.0], [0.0, 0.0022]])
 
 # Number of cores used for parallel updating of particles
 NUM_CORES = 28
