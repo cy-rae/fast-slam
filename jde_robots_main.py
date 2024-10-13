@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 from numpy import ndarray
 
@@ -9,15 +11,15 @@ from fast_slam_2 import Robot
 from fast_slam_2 import Serializer
 
 # Number of particle
-NUM_PARTICLES = 30
+NUM_PARTICLES = 28
 
 # Translation and rotation noise represent the standard deviation of the translation and rotation.
 # The noise is used to add uncertainty to the movement of the robot and particles.
-TRANSLATION_NOISE = 0.005
-ROTATION_NOISE = 0.004
+TRANSLATION_NOISE = 0.03
+ROTATION_NOISE = 0.001
 
 # The measurement noise of the Kalman filter depends on the laser's accuracy
-MEASUREMENT_NOISE = np.array([[0.0001, 0.0], [0.0, 0.0001]])
+MEASUREMENT_NOISE = np.array([[0.001, 0.0], [0.0, 0.001]])
 
 # Number of cores used for parallel updating of particles
 NUM_CORES = 28
@@ -37,15 +39,15 @@ while True:
         continue
 
     # Move the robot
-    v, w = robot.move(0.3, 0.4)
+    v, w = robot.move(0.5, 0.5)
 
     # Scan the environment using the robot's laser data
     scanned_points: ndarray = robot.scan_environment()
 
     # Get the translation and rotation of the robot using ICP based on the scanned points and the previous points that the robot has saved.
-    d_ang, d_lin = robot.get_displacement(v, w)
+    # d_ang, d_lin = robot.get_displacement(v, w)
     # d_ang, d_lin= robot.get_transformation(scanned_points, v, w)
-    # d_ang, d_lin = robot.get_rotation_and_translation(scanned_points, v, w)
+    d_ang, d_lin = robot.get_rotation_and_translation(scanned_points, v, w)
 
     # Search for landmarks in the scanned points using line filter and hough transformation and get the measurements to them
     measurement_list: list[Measurement] = LandmarkUtils.get_measurements_to_landmarks(scanned_points)
@@ -71,3 +73,5 @@ while True:
 
     # Serialize the robot, particles, and landmarks to a JSON file and store it in the shared folder
     Serializer.serialize(robot, actual_pos, fast_slam.particles, LandmarkUtils.known_landmarks, results)
+
+    time.sleep(0.2)
