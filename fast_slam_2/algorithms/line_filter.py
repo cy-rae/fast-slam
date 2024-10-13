@@ -5,7 +5,7 @@ from scipy import ndimage
 
 class LineFilter:
     @staticmethod
-    def filter(points: ndarray, sigma=0.1):
+    def filter(points: ndarray, sigma=0.1) -> ndarray:
         """
         Apply a Gaussian filter to the points to reduce noise.
         :param points: The points to filter

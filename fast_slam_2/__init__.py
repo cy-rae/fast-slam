@@ -15,6 +15,7 @@ from .models.particle import Particle
 from .models.point import Point
 from .models.robot import Robot
 from .utils.evaluation_utils import EvaluationUtils
+from .utils.obstacle_utils import ObstacleUtils
 
 # Provide utils
 from .utils.geometry_utils import GeometryUtils

@@ -9,6 +9,7 @@ from fast_slam_2 import LandmarkUtils
 from fast_slam_2 import Measurement
 from fast_slam_2 import Robot
 from fast_slam_2 import Serializer
+from fast_slam_2 import ObstacleUtils
 
 # Number of particle
 NUM_PARTICLES = 28
@@ -44,6 +45,9 @@ while True:
     # Scan the environment using the robot's laser data
     scanned_points: ndarray = robot.scan_environment()
 
+    # Update the known obstacles with the scanned points
+    ObstacleUtils.update_obstacles(scanned_points)
+
     # Get the translation and rotation of the robot using ICP based on the scanned points and the previous points that the robot has saved.
     # d_ang, d_lin = robot.get_displacement(v, w)
     # d_ang, d_lin= robot.get_transformation(scanned_points, v, w)
@@ -73,5 +77,6 @@ while True:
 
     # Serialize the robot, particles, and landmarks to a JSON file and store it in the shared folder
     Serializer.serialize(robot, actual_pos, fast_slam.particles, LandmarkUtils.known_landmarks, results)
+    Serializer.serialize_obstacles(ObstacleUtils.obstacles)
 
     time.sleep(0.2)

@@ -43,3 +43,23 @@ class Serializer:
         # Write JSON file
         with open(Serializer.file_path, 'w') as json_file:
             json.dump(json_data, json_file, indent=4)
+
+    @staticmethod
+    def serialize_obstacles(obstacles: list[Point]):
+        """
+        Serialize the passed obstacles to a JSON serializable dictionary and write the JSON data to a file in the shared
+        folder.
+        :param obstacles: The list of obstacles
+        """
+        json_data = {
+            'obstacles': [obstacle.to_dict() for obstacle in obstacles]
+        }
+
+        # Ensure that the shared folder exists
+        os.makedirs(Serializer.shared_path, exist_ok=True)
+
+        path = os.path.join(Serializer.shared_path, 'obstacles.json')
+
+        # Write JSON file
+        with open(path, 'w') as json_file:
+            json.dump(json_data, json_file, indent=4)

@@ -98,3 +98,22 @@ class Deserializer:
             points.append(point)
 
         return points
+
+    @staticmethod
+    def deserialize_obstacles(file_path: str) -> list[tuple[float, float]]:
+        # Check if file exists
+        if not file_path or not os.path.exists(file_path):
+            print(f"File {file_path} does not exist.")
+            return []
+
+        # Read the JSON data from the file
+        with open(file_path, 'r') as file:
+            try:
+                json_data: dict = json.load(file)
+            except Exception as e:
+                print(f"Error while reading the JSON data: {e}")
+                return []
+
+            obstacles: list[tuple[float, float]] = Deserializer.__deserialize_points(json_data['obstacles'])
+
+        return obstacles

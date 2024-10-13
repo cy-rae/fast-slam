@@ -184,15 +184,34 @@ class MapUtils:
             fontsize=12
         )
 
-        # ax.text(
-        #     -11,
-        #     -15,
-        #     f"Zeitstempel: {results['timestamp']}\n"
-        #     f"∅ Gesamtabweichung: {results['average_deviation']}%\n"
-        #     f"X-Abweichung: {results['x_deviation']}%\n"
-        #     f"y-Abweichung: {results['y_deviation']}%\n"
-        #     f"Winkelabweichung: {results['angular_deviation']}%\n"
-        #     f"Distanz zwischen der tatsächlichen und vorhergesagten Roboterposition: {results['distance']}m",
-        #     fontsize=12,
-        #     color='black'
-        # )
+    @staticmethod
+    def create_map(obstacle: list[tuple[float, float]]):
+        """
+        Initialize the plot
+        """
+        # Create a figure and axis
+        fig, ax = plt.subplots(figsize=(10, 10))
+
+        # Set limits and labels
+        ax.set_xlim([-10, 10])
+        ax.set_ylim([-10, 10])
+        ax.axhline(0, color='black', linewidth=1)  # x axis
+        ax.axvline(0, color='black', linewidth=1)  # y axis
+
+        # Axis labels
+        ax.set_xlabel('x-axis')
+        ax.set_ylabel('y-axis')
+        ax.text(-11, 11, "Map created by the fast_slam_2 2.0 algorithm", fontsize=12, color='black')
+        ax.grid(True)  # Show grid
+
+        # Mark obstacles as black dots
+        MapUtils.__plot_as_dots(
+            ax,
+            obstacle,
+            'k',
+            zorder=1,
+            label='Obstacles'
+        )
+
+        # Store the plot as an image
+        plt.savefig('dist/map.png')
