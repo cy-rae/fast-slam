@@ -10,13 +10,14 @@ class ObstacleUtils:
     """
     This class is responsible for the management of all known obstacles.
     """
-    obstacles: list[Point]
+    obstacles: list[Point] = []
 
     @staticmethod
     def update_obstacles(scanned_points: ndarray, robot: DirectedPoint):
         """
         Update the list of known obstacles with the scanned points.
         :param scanned_points: The scanned points as a numpy array
+        :param robot: The robot object
         """
         # Filter the points to reduce noice
         scanned_points = LineFilter.filter(scanned_points)
@@ -33,7 +34,7 @@ class ObstacleUtils:
         new_obstacles: list[Point] = []
 
         # Iterate through all scanned points
-        for scanned_point in scanned_points:
+        for point in observed_points:
             # Set a boolean that determines if the scanned point is a new obstacle
             is_new = True
 
@@ -41,7 +42,7 @@ class ObstacleUtils:
             for obstacle in ObstacleUtils.obstacles:
                 # Calculate the euclidean distance between the scanned point and the known obstacle
                 distance = np.sqrt(
-                    (scanned_point[0] - obstacle.x) ** 2 + (scanned_point[1] - obstacle.y) ** 2
+                    (point.x - obstacle.x) ** 2 + (point.y - obstacle.y) ** 2
                 )
 
                 # If the distance is smaller than the threshold, the scanned point is not a new obstacle
@@ -51,7 +52,7 @@ class ObstacleUtils:
 
             # If the scanned point is a new obstacle, add it to the list of new obstacles
             if is_new:
-                new_obstacles.append(Point(scanned_point[0], scanned_point[1]))
+                new_obstacles.append(Point(point.x, point.y))
 
         # Extend the list of known obstacles with the new obstacles
         ObstacleUtils.obstacles.extend(new_obstacles)

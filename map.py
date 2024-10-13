@@ -30,5 +30,10 @@ if __name__ == "__main__":
                 results=results
             )
 
+        obstacles = Deserializer.deserialize_obstacles(os.path.join(shared_path, 'obstacles.json'))
+        if len(obstacles) > 0:
+            # Plot the obstacles
+            MapUtils.create_map(obstacles)
+
         # Wait for a second before updating the map
         time.sleep(0.5)
