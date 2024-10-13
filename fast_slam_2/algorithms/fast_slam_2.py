@@ -197,23 +197,6 @@ class FastSLAM2:
         The estimation is based on the mean of the particles.
         :return: Returns the estimated position of the robot as a tuple (x, y, yaw)
         """
-        # x_mean = 0.0 TODO CHECK IF THIS IS BETTER
-        # y_mean = 0.0
-        # yaw_mean = 0.0
-        # total_weight = sum(p.weight for p in self.particles)
-        #
-        # # Calculate the mean of the particles
-        # for p in self.particles:
-        #     x_mean += p.x * p.weight
-        #     y_mean += p.y * p.weight
-        #     yaw_mean += p.yaw * p.weight
-        #
-        # # Normalize the estimated position
-        # x_mean /= total_weight
-        # y_mean /= total_weight
-        # yaw_mean /= total_weight
-        # yaw_mean = (yaw_mean + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw is between -pi and pi
-
         # Get the particle with the biggest weight
         best_particle = max(self.particles, key=lambda p: p.weight)
 
