@@ -86,7 +86,7 @@ class EvaluationUtils:
         average_deviation = (x_deviation + y_deviation + angular_deviation) / 3
 
         # Create results object
-        timestamp: str = datetime.now().strftime("%d.%m.%y %H:%M:%S")
+        timestamp: str = datetime.now().strftime("%m/%d/%Y %I:%M:%S %p")
         results = EvaluationResults(
             timestamp,
             round(average_deviation, 2),

@@ -34,7 +34,7 @@ class MapUtils:
                 scale=5,
                 color='red',
                 zorder=4,
-                label='Geschätzte Roboterposition'
+                label='Estimated robot position'
             )
 
             # Plot the actual robot position as a red arrow
@@ -44,7 +44,7 @@ class MapUtils:
                 scale=5,
                 color='black',
                 zorder=3,
-                label='Tatsächliche Roboterposition'
+                label='Actual robot position'
             )
 
             # Plot the particles as blue arrows
@@ -54,7 +54,7 @@ class MapUtils:
                 scale=5,
                 color='blue',
                 zorder=2,
-                label='Partikel'
+                label='Particles'
             )
 
             # Mark landmarks as green dots
@@ -63,12 +63,11 @@ class MapUtils:
                 landmarks,
                 'g',
                 zorder=1,
-                label='Landmarken'
+                label='Landmarks'
             )
 
             # Add the legend below the plot
-            ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
-                      fancybox=True, shadow=True, ncol=1)
+            ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=1)
 
             # Add the results as text under the plot
             MapUtils.__add_results_text(fig, results)
@@ -84,7 +83,7 @@ class MapUtils:
         Initialize the plot
         """
         # Create a figure and axis
-        fig, ax = plt.subplots(figsize=(10, 10))
+        fig, ax = plt.subplots(figsize=(10, 12))
 
         # Set limits and labels
         ax.set_xlim([-10, 10])
@@ -93,8 +92,8 @@ class MapUtils:
         ax.axvline(0, color='black', linewidth=1)  # y axis
 
         # Axis labels
-        ax.set_xlabel('x axis')
-        ax.set_ylabel('y axis')
+        ax.set_xlabel('x-axis')
+        ax.set_ylabel('y-axis')
         ax.text(-11, 11, "Map created by the fast_slam_2 2.0 algorithm", fontsize=12, color='black')
         ax.grid(True)  # Show grid
 
@@ -169,15 +168,31 @@ class MapUtils:
         :param fig: The figure to add the text to
         :param results: The results to add as text
         """
+        # Adjust the layout to add space at the bottom
+        fig.subplots_adjust(bottom=0.25)  # Adjust the bottom to make space for the text
+
         fig.text(
-            0.5,
-            -0.1,
-            f"Zeitstempel: {results['timestamp']}\n"
-            f"∅ Gesamtabweichung: {results['average_deviation']}%\n"
-            f"X-Abweichung: {results['x_deviation']}%\n"
-            f"y-Abweichung: {results['y_deviation']}%\n"
-            f"Winkelabweichung: {results['angular_deviation']}%\n"
-            f"Distanz zwischen der tatsächlichen und vorhergesagten Roboterposition: {results['distance']}m",
-            ha='center',
+            0.1,
+            0.02,
+            f"Timestamp: {results['timestamp']}\n"
+            f"∅ deviation: {results['average_deviation']}%\n"
+            f"X-deviation: {results['x_deviation']}%\n"
+            f"Y-deviation: {results['y_deviation']}%\n"
+            f"Angular deviation: {results['angular_deviation']}%\n"
+            f"Distance between the actual and estimated robot position: {results['distance']}m",
+            ha='left',
             fontsize=12
         )
+
+        # ax.text(
+        #     -11,
+        #     -15,
+        #     f"Zeitstempel: {results['timestamp']}\n"
+        #     f"∅ Gesamtabweichung: {results['average_deviation']}%\n"
+        #     f"X-Abweichung: {results['x_deviation']}%\n"
+        #     f"y-Abweichung: {results['y_deviation']}%\n"
+        #     f"Winkelabweichung: {results['angular_deviation']}%\n"
+        #     f"Distanz zwischen der tatsächlichen und vorhergesagten Roboterposition: {results['distance']}m",
+        #     fontsize=12,
+        #     color='black'
+        # )
