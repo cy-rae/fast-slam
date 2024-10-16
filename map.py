@@ -29,6 +29,3 @@ if __name__ == "__main__":
                 landmarks=landmarks,
                 results=results
             )
-
-        # Wait for a second before updating the map
-        time.sleep(0.5)

@@ -1,4 +1,6 @@
-﻿import HAL
+﻿import time
+
+import HAL
 import numpy as np
 
 
@@ -43,7 +45,6 @@ while True:
 
     timestamp = HAL.getLaserData().timeStamp
     delta_t = timestamp - prev_timestamp
-    prev_timestamp = timestamp
 
     # Calculate the displacement of the robot
     d_ang = w * delta_t
@@ -55,11 +56,18 @@ while True:
     y += d_lin * np.sin(yaw)
 
     # Print the updated position of the robot
-    print('\nYAW', yaw)
-    print('ACTUAL YAW', HAL.getPose3d().yaw)
+    # print('\ndisplacement', d_lin, delta_t)
+    # print('Timestamps', timestamp, prev_timestamp)
+    prev_timestamp = timestamp
+
+    # # Print the updated position of the robot
+    # print('\nYAW', yaw)
+    # print('ACTUAL YAW', HAL.getPose3d().yaw)
 
     print('\nX', x)
     print('ACTUAL X', HAL.getPose3d().x + 1)
 
-    print('\nY', y)
-    print('ACTUAL Y', HAL.getPose3d().y - 1.5)
+    # print('\nY', y)
+    # print('ACTUAL Y', HAL.getPose3d().y - 1.5)
+
+    time.sleep(0.7)
