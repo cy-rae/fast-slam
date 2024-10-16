@@ -102,7 +102,7 @@ class EvaluationUtils:
         print(f"X deviation: {results.x_deviation}%")
         print(f"Y deviation: {results.y_deviation}%")
         print(f"Angular deviation: {results.angular_deviation}%")
-        print(f"Distance between actual and estimated position: {results.distance}%")
+        print(f"Distance between actual and estimated position: {results.distance}m")
 
         return results, EvaluationUtils.__actual_pos
 
