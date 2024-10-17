@@ -35,7 +35,7 @@ class EvaluationUtils:
 
         # Check if the actual robot position is not at the origin. If the actual robot position is at the origin, the
         # offset values are already initialized.
-        if not np.isclose(x, 0.0, rtol=1e-09, atol=1e-09) or not np.isclose(y, 0.0, rtol=1e-09, atol=1e-09):
+        if x < -0.5 and y > 0.5:
             # Initialize the offset values
             EvaluationUtils.__offset_x = x
             EvaluationUtils.__offset_y = y
@@ -45,8 +45,8 @@ class EvaluationUtils:
     @staticmethod
     def set_actual_pos():
         """
-        Set the actual position of the robot. The offset values are subtracted from the actual robot position to move the
-        actual robot position to the origin of the FastSLAM 2.0 map.
+        Set the actual position of the robot. The offset values are subtracted from the actual robot position to move
+        the actual robot position to the origin of the FastSLAM 2.0 map.
         """
         EvaluationUtils.__actual_pos = DirectedPoint(
             HAL.getPose3d().x - EvaluationUtils.__offset_x,

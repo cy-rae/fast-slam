@@ -11,7 +11,8 @@ from fast_slam_2.utils.evaluation_utils import EvaluationUtils
 
 class Robot(DirectedPoint):
     """
-    This class represents the robot
+    This class represents the robot and provides methods to move the robot, scan the environment, and get the
+    transformation.
     """
 
     def __init__(self, x=0.0, y=0.0, yaw=0.0):
@@ -20,9 +21,6 @@ class Robot(DirectedPoint):
         # Initialize the robot with the first scan
         self.__prev_points: ndarray = self.scan_environment()
         self.__prev_timestamp: int = HAL.getLaserData().timeStamp
-        self.__prev_x = HAL.getPose3d().x
-        self.__prev_y = HAL.getPose3d().y
-        self.__prev_yaw = HAL.getPose3d().yaw
 
     @staticmethod
     def scan_environment() -> ndarray:
@@ -83,12 +81,13 @@ class Robot(DirectedPoint):
 
         return v, w
 
-    def get_transformation(self, target_points: ndarray, v: float, w: float) -> tuple[float, float]:
+    def get_transformation_icp(self, target_points: ndarray, v: float) -> tuple[float, float]:
         """
-        Get the rotation and translation between the source and target points using the Iterative Closest Point (ICP) algorithm.
+        Get the rotation and translation between the source and target points using the Iterative Closest Point (ICP)
+        algorithm. This method provides somewhat poorer results than the transformation calculation based on the control
+        commands, which is why it is not used.
         :param target_points: Nx2 array of target points
         :param v: The linear velocity of the robot
-        :param w: The angular velocity of the robot
         :return: Returns the rotation in radians and translation vector
         """
         # Set the current position to avoid false positive results due to time difference
@@ -100,26 +99,27 @@ class Robot(DirectedPoint):
         # Update the previous points with the target points for the next iteration
         self.__prev_points = target_points
 
-        # Covert the rotation matrix to an angle in radians
-        rotation = -np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
-
-        # Compute the linear distance the robot has moved
-        d_linear = np.linalg.norm(translation_vector)
-
-        # Set the linear or angular displacement to 0 if the robot is not moving or rotating
-        if v == 0:
-            d_linear = 0
-        if w == 0:
+        # If the robot is moving it, the rotation will be ignored
+        if v != 0:
             rotation = 0
+            # Compute the linear distance the robot has moved
+            translation = np.linalg.norm(translation_vector)
 
-        return rotation, d_linear
+        # If the robot is rotating, the translation will be ignored
+        else:
+            # Covert the rotation matrix to an angle in radians
+            rotation = -np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+            translation = 0
 
-    def get_displacement(self, v: float, w: float) -> tuple[float, float]:
+        return rotation, translation
+
+    def get_transformation(self, v: float, w: float) -> tuple[float, float]:
         """
-        Get the linear and angular displacement of the robot based on the linear and angular velocity.
+        Get the transformation of the robot based on the control commands (linear and angular velocity) and the time
+        difference.
         :param v: The linear velocity of the robot
         :param w: The angular velocity of the robot
-        :return: Returns the linear and angular displacement of the robot as a tuple (d_lin, d_ang)
+        :return: Returns the translation and rotation of the robot as a tuple (rotation, translation)
         """
         # Get the difference in time between the current and previous timestamp and update the previous timestamp
         curr_timestamp: int = HAL.getLaserData().timeStamp
@@ -131,47 +131,15 @@ class Robot(DirectedPoint):
         dt: int = curr_timestamp - self.__prev_timestamp
         self.__prev_timestamp = curr_timestamp
 
-        # Calculate the linear and angular displacement of the robot
-        d_ang = w * dt
-        d_lin = v * dt * 0.6 # Calculate the linear displacement of the robot in cm/s instead of m/min
+        # If the robot is driving, the rotation will be ignored.
+        if v != 0:
+            rotation = 0
+            # The translation is multiplied by 0.6 because the simulation reduces the input velocity by 40%.
+            translation = v * dt * 0.6
 
-        # Set the linear or angular displacement to 0 if the robot is not moving or rotating
-        if v == 0:
-            d_lin = 0
-        if w == 0:
-            d_ang = 0
+        # If the robot is rotating, the translation will be ignored.
+        else:
+            rotation = w * dt
+            translation = 0
 
-        return d_ang, d_lin
-
-    def get_rotation_and_translation(self, target_points: ndarray, v: float, w: float) -> tuple[float, float]:
-        """
-        Get the linear displacement of the robot using ICP and the angular displacement based on the angular velocity
-        and time difference.
-        :param target_points: Nx2 array of target points
-        :param v: The linear velocity of the robot
-        :param w: The angular velocity of the robot
-        :return: Returns the linear and angular displacement of the robot as a tuple (d_lin, d_ang)
-        """
-        # Get the difference in time between the current and previous timestamp and update the previous timestamp
-        curr_timestamp: int = HAL.getLaserData().timeStamp
-
-        # Set the current position to avoid false positive results due to time difference
-        EvaluationUtils.set_actual_pos()
-
-        # Calculate the angular displacement of the robot based on the angular velocity and time difference
-        dt: int = curr_timestamp - self.__prev_timestamp
-        self.__prev_timestamp = curr_timestamp
-        d_ang = w * dt
-
-        # Get the translation vector between the previous and target points using ICP
-        _, translation_vector = ICP.get_transformation(self.__prev_points, target_points)
-        self.__prev_points = target_points
-        d_lin = np.linalg.norm(translation_vector)
-
-        # Set the linear or angular displacement to 0 if the robot is not moving or rotating
-        if v == 0:
-            d_lin = 0
-        if w == 0:
-            d_ang = 0
-
-        return d_ang, d_lin
+        return rotation, translation
