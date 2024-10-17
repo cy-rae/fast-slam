@@ -1,5 +1,3 @@
-import time
-
 import numpy as np
 from numpy import ndarray
 
@@ -10,27 +8,9 @@ from fast_slam_2 import Measurement
 from fast_slam_2 import Robot
 from fast_slam_2 import Serializer
 
-# Number of particle
-NUM_PARTICLES = 20
-
-# Translation and rotation noise represent the standard deviation of the translation and rotation.
-# The noise is used to add uncertainty to the movement of the robot and particles.
-TRANSLATION_NOISE = 0.0055
-ROTATION_NOISE = 0.001
-
-# The measurement noise of the Kalman filter depends on the laser's accuracy
-MEASUREMENT_NOISE = np.array([[0.001, 0.0], [0.0, 0.001]])
-
-# Number of cores used for parallel updating of particles
-NUM_CORES = 28
-
-
-
-
-
 # Initialize the robot, FastSLAM 2.0 algorithm and landmark list
 robot = Robot()
-fast_slam = FastSLAM2(NUM_PARTICLES)
+fast_slam = FastSLAM2()
 
 MIN_ITERATIONS = 150
 iteration = 0
@@ -54,18 +34,9 @@ while True:
 
     # Iterate the fast_slam_2 2.0 algorithm with the linear and angular velocities and the measurements to the observed landmarks
     # and estimate the position of the robot based on the particles.
-    # If the iteration is less than the minimum iterations, the robot will be updated by the displacement of the robot.
-    (x, y, yaw) = fast_slam.iterate(
-        translation,
-        rotation,
-        measurement_list,
-        TRANSLATION_NOISE,
-        ROTATION_NOISE,
-        MEASUREMENT_NOISE,
-        NUM_PARTICLES,
-        NUM_CORES
-    )
+    (x, y, yaw) = fast_slam.iterate(rotation, translation, measurement_list)
 
+    # If the iteration is less than the minimum iterations, the robot will be updated by the displacement of the robot.
     if iteration < MIN_ITERATIONS:
         robot.yaw = (robot.yaw + rotation + np.pi) % (2 * np.pi) - np.pi
         robot.x = robot.x + translation * np.cos(robot.yaw)

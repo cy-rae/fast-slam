@@ -2,6 +2,7 @@
     """
     Class to store the results of the evaluation of the FastSLAM 2.0 algorithm.
     """
+
     def __init__(
             self,
             timestamp: str,
