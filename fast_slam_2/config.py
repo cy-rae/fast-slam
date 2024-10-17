@@ -21,4 +21,4 @@ MEASUREMENT_NOISE = np.array([[0.001, 0.0], [0.0, 0.001]])
 MAXIMUM_LANDMARK_DISTANCE = 8
 
 # Number of cores used for parallel updating of particles
-NUM_CORES = 20
+NUM_THREAD = 20

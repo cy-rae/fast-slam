@@ -2,7 +2,7 @@
 
 # Install the requirements for the map main
 echo "Install the requirements for the map main..."
-pip install -r requirements.txt
+pip install -r landmark_map/requirements.txt
 
 # Create shared folder if it does not exist
 SHARED_DIR="C:/shared"  # Change this to the path of the shared folder on your host machine
