@@ -14,12 +14,12 @@ from fast_slam_2.utils.landmark_utils import LandmarkUtils
 
 class FastSLAM2:
     """
-    Class that realizes the fast_slam_2 2.0 algorithm.
+    Class that realizes the FastSLAM 2.0 algorithm.
     """
 
     def __init__(self):
         """
-        Initialize the fast_slam_2 2.0 algorithm with the specified number of particles.
+        Initialize the FastSLAM 2.0 algorithm with the specified number of particles.
         """
         # Initialize particles with the start position of the robot
         self.particles: list[Particle] = [
@@ -33,10 +33,10 @@ class FastSLAM2:
     def iterate(self, rotation: float, translation: float, measurements: list[Measurement]) -> tuple[
         float, float, float]:
         """
-        Perform one iteration of the fast_slam_2 2.0 algorithm using the passed translation, rotation, and measurements.
-        :param translation: The translation vector of the robot
-        :param rotation: The rotation angle of the robot in radians
-        :param measurements: List of measurements to observed landmarks (distances and angles of landmark to robot and landmark ID)
+        Perform one iteration of the FastSLAM 2.0 algorithm using the passed translation, rotation, and measurements.
+        :param rotation: The performed rotation in radians
+        :param translation: The performed translation the robot
+        :param measurements: List of measurements to observed landmarks (from the robot's perspective)
         """
         # Move particles in extra threads to speed up the process
         with ThreadPoolExecutor(max_workers=NUM_THREAD) as executor:
@@ -52,7 +52,7 @@ class FastSLAM2:
                            self.particles]
                 wait(futures)
 
-        # Normalize weights and resample particles
+        # Normalize weights
         self.__normalize_weights()
 
         # Calculate the number of effective particles
@@ -60,7 +60,7 @@ class FastSLAM2:
 
         # Resample particles if the effective number of particles is less than half of the total number of particles
         if num_effective_particles < NUM_PARTICLES / 2:
-            print('RESAMPLING')
+            print('\nRESAMPLING')
             self.__low_variance_resample()
 
         # Return the estimated position of the robot
@@ -68,26 +68,34 @@ class FastSLAM2:
 
     def __move_particle(self, index: int, rotation: float, translation: float, ):
         """
-        Update the particle (determined by the passed index) based on the passed translation vector and rotation.
+        Update the pose of the particle (determined by the passed index) based on the passed translation vector and rotation.
         :param index: The index of the particle in the particle list
         :param translation: The translation vector of the robot
         :param rotation: The rotation angle of the robot in radians
         """
         # Apply uncertainty to the movement of the robot and particles using random Gaussian noise with the standard deviations
         if rotation != 0:
-            translation = 0
-            rotation = rotation + np.random.normal(0, ROTATION_NOISE)
+            noisy_translation = 0
+            noisy_rotation = rotation + np.random.normal(0, ROTATION_NOISE)
         else:
-            translation = translation + np.random.normal(0, TRANSLATION_NOISE)
-            rotation = 0
+            noisy_translation = translation + np.random.normal(0, TRANSLATION_NOISE)
+            noisy_rotation = 0
 
-        self.particles[index].yaw = (self.particles[index].yaw + rotation + np.pi) % (
+        self.particles[index].yaw = (self.particles[index].yaw + noisy_rotation + np.pi) % (
                 2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
-        self.particles[index].x += translation * np.cos(self.particles[index].yaw)
-        self.particles[index].y += translation * np.sin(self.particles[index].yaw)
+        self.particles[index].x += noisy_translation * np.cos(self.particles[index].yaw)
+        self.particles[index].y += noisy_translation * np.sin(self.particles[index].yaw)
 
     @staticmethod
     def __update_particle(particle: Particle, measurement: Measurement):
+        """
+        Update the particle based on the passed measurement to an observed landmark.
+        A new landmark will be updated if no landmark is associated with the measurement can be found.
+        Otherwise, the particle's landmark will be updated based on the passed measurement using and extended Kalman filter.
+        The particle weight will be updated based on the likelihood of the measurement.
+        :param particle: The particle to update
+        :param measurement: The measurement to an observed landmark that should be used to update the particle
+        """
         # Search for the associated landmark by comparing the position of the observation and the particle's landmarks
         observed_landmark = Landmark(
             measurement.distance * np.cos(measurement.yaw),
@@ -169,7 +177,6 @@ class FastSLAM2:
     def __low_variance_resample(self):
         """
         Resample particles with low variance resampling.
-        :return:
         """
         # Initialize resampling variables
         new_particles = []  # Create a list to store the new particles
@@ -200,12 +207,7 @@ class FastSLAM2:
         # Get the particle with the biggest weight
         best_particle = max(self.particles, key=lambda p: p.weight)
 
-        # Use the best particle's position as the estimated position
-        x_mean = best_particle.x
-        y_mean = best_particle.y
-        yaw_mean = best_particle.yaw
-
-        return x_mean, y_mean, yaw_mean
+        return best_particle.x, best_particle.y, best_particle.yaw
 
     def __calculate_effective_particles(self) -> float:
         """
