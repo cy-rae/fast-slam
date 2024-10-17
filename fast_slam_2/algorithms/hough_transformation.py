@@ -3,6 +3,9 @@ import numpy as np
 
 
 class HoughTransformation:
+    """
+    The HoughTransformation class is used to detect line intersections in a set of points using the hough transformation.
+    """
     # Constants for the hough transformation
     __padding: int = 20
     __scale_factor: int = 100
