@@ -6,6 +6,10 @@ from sklearn.cluster import DBSCAN
 
 
 class GeometryUtils:
+    """
+    This class contains utility methods for geometry calculations.
+    """
+
     @staticmethod
     def mahalanobis_distance(position_a: ndarray, position_b: ndarray, covariance_matrix: ndarray) -> float:
         """
@@ -58,13 +62,13 @@ class GeometryUtils:
         return cluster_centers
 
     @staticmethod
-    def calculate_distance_and_angle(x: float, y: float):
+    def calculate_distance_and_angle(x: float, y: float) -> tuple[float, float]:
         """
         Calculate the distance and angle of a point to the origin (0, 0). The angle is rotated by -90 degrees.
         :param x: The x coordinate of the point
         :param y: The y coordinate of the point
         :return: Returns the distance(s) and angle(s) of the point(s) to the origin (0, 0)
         """
-        distance = math.sqrt(x ** 2 + y ** 2)
-        angle = math.atan2(y, x)
+        distance: float = math.sqrt(x ** 2 + y ** 2)
+        angle: float = math.atan2(y, x)
         return distance, angle
