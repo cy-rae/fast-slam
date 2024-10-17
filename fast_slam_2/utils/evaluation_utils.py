@@ -76,7 +76,7 @@ class EvaluationUtils:
         # Calculate the distance between the actual and estimated position
         distance = np.sqrt(dx ** 2 + dy ** 2)
 
-        # Calculate the deviation of the yaw angle in percentage
+        # Calculate the deviation of the angle in percentage
         angular_deviation = EvaluationUtils.__calculate_angular_deviation(
             EvaluationUtils.__actual_pos.yaw,
             estimated_pos.yaw
@@ -118,7 +118,7 @@ class EvaluationUtils:
         delta = actual - estimated
 
         # Calculate the deviation percentage for the x-coordinate
-        x_deviation_percentage = abs(delta) * 100  # Times 100 so 100% equals difference of 1 'meter'
+        x_deviation_percentage = abs(delta) * 100  # Times 100 so 100% equals difference of 1 meter
 
         return x_deviation_percentage, delta
 
