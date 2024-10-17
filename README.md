@@ -10,15 +10,15 @@ To start the simulation environment and run the FastSLAM 2.0 implementation,
 you need to create a Docker container using the provided Dockerfile.
 A bash script named `startup.sh` is located in the root directory of this repository and
 will automatically build the Docker image by performing the following steps:
-1. Install the necessary Python packages on your local system for the map module.
+1. Install the necessary Python packages on your local system for the `landmark_map` module.
 2. Create a shared folder on your local device to exchange files between your local system and the Docker container.
    - To change the shared folder, update the paths in both `landmark_map/main.py` and `startup.py`. Ensure that the paths match. The default shared folder path is `C:/shared`.
 3. Build the `jderobot/robotics-backend` Docker image. 
 4. Copy the FastSLAM 2.0 package to the Docker image. 
-5. Install the required Python packages inside the Docker container. 
+5. Install the required Python packages inside the Docker image. 
 6. Run the Docker container with the shared folder mounted.
 
-To run the `startup.sh`, ensure that Docker Desktop is running, then execute the following command in a **bash** terminal:
+To run the `startup.sh`, **ensure that Docker Desktop is running**, then execute the following command in a **bash** terminal:
 ```bash
 bash startup.sh
 ```
@@ -41,14 +41,14 @@ The `landmark_map` module can access these JSON files via the shared folder to c
 It is therefore important that the paths for the shared folder are correctly set in `landmark_map/main.py` and `startup.sh`.
 This separation offloads the map generation process from the robot,
 keeping the computational load of the FastSLAM 2.0 implementation low.
-This ensures performance and thus also the accuracy of localization.
+This ensures performance and the accuracy of the localization.
 
 ### FastSLAM 2.0 module
 The FastSLAM 2.0 implementation is located in the `fast_slam_2` module.
 It consists of model, utility, and algorithm classes, along with a configuration file, which will be explained in the following sections.
 
 Additionally, there is a `jde_robots_main.py` file in the root directory of this repository.
-This file contains the Python script that needs to be uploaded into the simulation environment to run the FastSLAM 2.0 implementation.
+This file contains the **Python script that needs to be uploaded into the simulation environment** to run the FastSLAM 2.0 implementation.
 It imports the necessary classes from the `fast_slam_2` module, initializes the FastSLAM 2.0 algorithm, and
 manages the while loop that controls both the robot's movement and the FastSLAM 2.0 algorithm.
 
@@ -59,7 +59,7 @@ The `config.py` file contains parameters which can be adjusted to adjust the Fas
 - `TRANSLATION_NOISE`: A factor that determines the noise in the robot's translation movement.
 - `ROTATION_NOISE`: A factor that determines the noise in the robot's rotation movement.
 - `MEASUREMENT_NOISE`: A covariance matrix that determines the noise in the measurements.
-- `MAXIMUM_LANDMARK_DISTANCE`: The maximum distance between to landmarks to be considered as the same landmark (mahalanobis distance).
+- `MAXIMUM_LANDMARK_DISTANCE`: The maximum distance between two landmarks to be considered as the same landmark (mahalanobis distance).
 - `NUM_THREADS`: The number of threads used for parallel processing.
 
 #### Model classes
@@ -77,7 +77,7 @@ The `fast_slam_2/utils` folder contains utility classes used in the FastSLAM 2.0
 - `GeometryUtils`: Provides methods to calculate geometric properties (e.g. mahalanobis distance, clustering, ...).
 - `LandmarkUtils`: Provides methods to manage landmarks (e.g. update, association ...).
 - `EvaluationUtils`: Provides methods to evaluate the FastSLAM 2.0 algorithm results.
-- `Serializer`: Provides methods to serialize the models to JSON files which will be stored in the shared folder.
+- `Serializer`: Provides methods to serialize the models to a JSON file which will be stored in the shared folder.
 
 #### Algorithm classes
 The `fast_slam_2/algorithms` folder contains algorithm classes used in the FastSLAM 2.0 implementation:
