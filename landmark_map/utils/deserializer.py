@@ -4,7 +4,7 @@ import os
 
 class Deserializer:
     """
-    Class to deserialize the JSON data that produces the FastSLAM 2.0 algorithm into classes.
+    Class to deserialize the JSON data that produces the FastSLAM 2.0 package.
     """
 
     @staticmethod
@@ -16,7 +16,7 @@ class Deserializer:
         dict[str, float or str] or None
     ]:
         """
-        Deserialize the JSON data into classes.
+        Deserialize the JSON data into tuples.
         :return: Returns the robot, landmarks, and particles as tuples and lists
         """
         # Check if file exists
