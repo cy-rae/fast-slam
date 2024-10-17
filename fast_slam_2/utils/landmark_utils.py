@@ -20,9 +20,9 @@ class LandmarkUtils:
     @staticmethod
     def get_measurements_to_landmarks(scanned_points: ndarray) -> list[Measurement]:
         """
-        Extract landmarks from the given scanned points using hough transformation and DBSCAN clustering.
-        A corner represents a landmark. The corners are calculated based on the intersection points of the scanned points.
-        :param scanned_points: Scanned points in the form of a numpy array. The coordinates are also represented as numpy arrays [x, y].
+        Extract landmarks from the given scanned points using hough transformation and DBSCAN clustering. A corner
+        represents a landmark. The corners are calculated based on the intersection points of the scanned points.
+        :param scanned_points: Scanned points as a Nx2 array.
         :return: Returns the measurements from the origin (0, 0) to the observed landmarks
         """
         # Get the observed landmarks
@@ -41,7 +41,7 @@ class LandmarkUtils:
         """
         Extract observed landmarks from the scanned points using the Hough transformation and DBSCAN clustering.
         A corner in the environment represents a landmark.
-        :param scanned_points: The scanned points in the form of a numpy array. The coordinates are represented as numpy arrays [x, y].
+        :param scanned_points: The scanned points in as a Nx2 array.
         :return: Returns the observed landmarks
         """
         # Apply line filter to the scanned points to reduce noise. The filtered points are represented as arrays [x, y]
@@ -102,8 +102,6 @@ class LandmarkUtils:
     ) -> tuple[Landmark or None, int or None]:
         """
         Search for associated landmarks based on the known landmarks and observed landmarks.
-        If a landmark is found, the ID of the landmark will be referenced by the corresponding measurement.
-        Else, the measurement will reference to a new landmark.
         :param observed_landmark: The observed landmark as a point
         :param particle_landmarks: The landmarks of the particle
         :return: Returns the associated landmark and its index
