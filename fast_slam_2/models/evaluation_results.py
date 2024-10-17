@@ -14,6 +14,12 @@
     ):
         """
         Initialize the object with the passed parameters.
+        :param timestamp: The timestamp of the evaluation
+        :param average_deviation: The average deviation of the particles
+        :param x_deviation: The deviation of the x coordinate
+        :param y_deviation: The deviation of the y coordinate
+        :param angular_deviation: The angular deviation
+        :param distance: The distance between the estimated position and the actual position
         """
         self.timestamp = timestamp
         self.average_deviation = average_deviation
