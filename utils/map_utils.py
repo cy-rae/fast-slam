@@ -215,3 +215,4 @@ class MapUtils:
 
         # Store the plot as an image
         plt.savefig('dist/map.png')
+        plt.close(fig)
