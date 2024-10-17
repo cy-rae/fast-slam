@@ -16,17 +16,23 @@ class Robot(DirectedPoint):
     """
 
     def __init__(self, x=0.0, y=0.0, yaw=0.0):
+        """
+        Initialize the robot with the passed parameters.
+        :param x: The x coordinate of the robot. The default value is 0.0.
+        :param y: The y coordinate of the robot. The default value is 0.0.
+        :param yaw: The angle of the robot in radians. The default value is 0.0.
+        """
         super().__init__(x, y, yaw)
 
-        # Initialize the robot with the first scan
-        self.__prev_points: ndarray = self.scan_environment()
+        # Initialize the robot with the first timestamp and scanned points
         self.__prev_timestamp: int = HAL.getLaserData().timeStamp
+        self.__prev_points: ndarray = self.scan_environment() # This line is being used for the ICP transformation
 
     @staticmethod
     def scan_environment() -> ndarray:
         """
         Scan the environment using the laser data and return a list of points that were scanned by the laser.
-        :return: Returns a ndarray of scanned points which are also ndarray of x and y coordinates
+        :return: Returns the scanned points as a Nx2 array [x, y]
         """
         # Get laser data from the robot. Laser data contains the distances and angles to obstacles in the environment.
         laser_data = HAL.getLaserData()
@@ -48,6 +54,7 @@ class Robot(DirectedPoint):
             x = dist * math.cos(angle)
             y = dist * math.sin(angle)
             scanned_points.append([x, y])
+
         return np.array(scanned_points)
 
     @staticmethod
@@ -56,7 +63,6 @@ class Robot(DirectedPoint):
         Set the linear and angular velocity of the robot based on the bumper state.
         :return: Returns the linear and angular velocity of the robot
         """
-        # First, move robot in real world
         # Set linear and angular velocity depending on the bumper state.
         bumper_state = HAL.getBumperData().state
         if bumper_state == 1:
@@ -70,7 +76,7 @@ class Robot(DirectedPoint):
             else:  # left or center bumper
                 w = -ang_velocity
 
-        # If the robot does not hit the wall, the linear and angular velocities will be set to 1 and 0 respectively
+        # If the robot does not hit the wall, the angular velocity will be set to 0
         else:
             v = lin_velocity
             w = 0
