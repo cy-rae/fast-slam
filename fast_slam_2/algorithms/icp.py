@@ -3,6 +3,12 @@ from scipy.spatial import KDTree
 
 
 class ICP:
+    """
+    This class implements the Iterative Closest Point (ICP) to calculate the transformation between two point clouds.
+    This class is not being used in the current implementation because it is better to calculate the transformation
+    using the control commands.
+    """
+
     @staticmethod
     def get_transformation(
             source_points: np.ndarray,
@@ -11,7 +17,8 @@ class ICP:
             threshold=1e-5
     ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Compute the best fitting rotation matrix and translation vector that aligns the source points to the target points.
+        Compute the best fitting rotation matrix and translation vector that aligns the source points to the target
+        points.
         :param source_points: Nx2 array of source points
         :param target_points: Nx2 array of target points
         :param max_iterations: Maximum number of iterations. Default is 100
@@ -24,7 +31,7 @@ class ICP:
         total_rotation = np.eye(2)
         total_translation = np.zeros((2,))
 
-        for i in range(max_iterations):
+        for _ in range(max_iterations):
             # Get the nearest neighbors in the target point cloud
             tree = KDTree(target_points)
             distances, indices = tree.query(source_points)
@@ -52,8 +59,8 @@ class ICP:
     @staticmethod
     def best_fit_transform(source_points, target_points):
         """
-        Compute the best fitting rotation matrix and translation vector
-        that aligns the source points to the target points.
+        Compute the best fitting rotation matrix and translation vector that aligns the source points to the target
+        points.
         """
         # Compute centroids of both point sets
         centroid_source = np.mean(source_points, axis=0)
