@@ -7,6 +7,10 @@ from fast_slam_2.models.point import Point
 
 
 class Serializer:
+    """
+    This class provides methods to serialize the estimated robot pose, the actual robot pose, particles, landmarks and
+    evaluation results to a JSON file.
+    """
     # Path to the output folder and file name
     shared_path = 'workspace/shared'
     file_name = 'fast_slam.json'
@@ -21,8 +25,8 @@ class Serializer:
             results: EvaluationResults
     ):
         """
-        Serialize the passed robot, particles and landmarks to a JSON serializable dictionary and write the JSON data
-        to a file in the shared folder.
+        Serialize the passed estimated robot pose, actual robot pose, particles, landmarks and evaluation result to a
+        JSON serializable dictionary and write the JSON data to a file in the shared folder.
         :param estimated_robot_pos: The robot object
         :param actual_robot_pos: The actual robot position
         :param particles: The list of particles
