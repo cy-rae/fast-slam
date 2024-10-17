@@ -46,7 +46,7 @@ while True:
     scanned_points: ndarray = robot.scan_environment()
 
     # Update the known obstacles with the scanned points
-    ObstacleUtils.update_obstacles(scanned_points, robot)
+    ObstacleUtils.upsert_points(scanned_points, robot)
 
     # Get the translation and rotation of the robot using ICP based on the scanned points and the previous points that the robot has saved.
     d_ang, d_lin = robot.get_displacement(v, w)

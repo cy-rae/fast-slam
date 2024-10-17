@@ -1,5 +1,6 @@
 ﻿import numpy as np
 from numpy import ndarray
+from scipy.spatial import KDTree
 
 from fast_slam_2.algorithms.line_filter import LineFilter
 from fast_slam_2.models.directed_point import DirectedPoint
@@ -11,48 +12,57 @@ class ObstacleUtils:
     This class is responsible for the management of all known obstacles.
     """
     obstacles: list[Point] = []
+    threshold = 0.5
 
     @staticmethod
-    def update_obstacles(scanned_points: ndarray, robot: DirectedPoint):
+    def upsert_points(scanned_points: ndarray, robot: DirectedPoint):
         """
-        Update the list of known obstacles with the scanned points.
-        :param scanned_points: The scanned points as a numpy array
-        :param robot: The robot object
+        Add or update the scanned points to the list of known obstacles.
+        :param scanned_points: The scanned points from the robot's perspective as a Nx2 array.
+        :param robot: The robot's current position and orientation.
         """
         # Filter the points to reduce noice
-        scanned_points = LineFilter.filter(scanned_points)
+        filtered_points = LineFilter.filter(scanned_points)
 
         # Get the points from the robot's perspective
         observed_points: list[Point] = []
-        for point in scanned_points:
+        for point in filtered_points:
             # Calculate the point in the robot's perspective
             x = robot.x + point[0] * np.cos(robot.yaw) - point[1] * np.sin(robot.yaw)
             y = robot.y + point[0] * np.sin(robot.yaw) + point[1] * np.cos(robot.yaw)
             observed_points.append(Point(x, y))
 
-        # Create a list to collect all new obstacles
-        new_obstacles: list[Point] = []
+        if len(ObstacleUtils.obstacles) == 0:
+            # Add all new points to the obstacles list
+            ObstacleUtils.obstacles.extend(observed_points)
+        else:
+            # Associate the new points with the existing points and update them
+            ObstacleUtils._update_existing_points(observed_points)
 
-        # Iterate through all scanned points
+    @staticmethod
+    def _update_existing_points(observed_points: list[Point]):
+        """
+        Associate the observed points with the existing points and update them.
+        :param observed_points: The observed points (global coordinates).
+        """
+        # Get the X, Y values of the existing obstacles
+        existing_obstacles = np.array([[point.x, point.y] for point in ObstacleUtils.obstacles])
+
+        # Use KD Tree to find the nearest points
+        tree = KDTree(existing_obstacles)
+
+        # Iterate over all observed points
         for point in observed_points:
-            # Set a boolean that determines if the scanned point is a new obstacle
-            is_new = True
+            # Find the nearest point
+            dist, index = tree.query(point.as_vector())
 
-            # Iterate through all known obstacles and check if the scanned point is already known
-            for obstacle in ObstacleUtils.obstacles:
-                # Calculate the euclidean distance between the scanned point and the known obstacle
-                distance = np.sqrt(
-                    (point.x - obstacle.x) ** 2 + (point.y - obstacle.y) ** 2
-                )
+            # If the distance is less than the threshold, update the point
+            if dist < ObstacleUtils.threshold:
+                existing_point = ObstacleUtils.obstacles[index].as_vector()
+                observed_point = point.as_vector()
+                updated_point = (existing_point + observed_point) / 2
+                ObstacleUtils.obstacles[index] = Point(updated_point[0], updated_point[1])
 
-                # If the distance is smaller than the threshold, the scanned point is not a new obstacle
-                if distance <= 0.1:
-                    is_new = False
-                    break
-
-            # If the scanned point is a new obstacle, add it to the list of new obstacles
-            if is_new:
-                new_obstacles.append(Point(point.x, point.y))
-
-        # Extend the list of known obstacles with the new obstacles
-        ObstacleUtils.obstacles.extend(new_obstacles)
+            # If the distance is greater than the threshold, add the point to the obstacles list
+            else:
+                ObstacleUtils.obstacles.append(point)
