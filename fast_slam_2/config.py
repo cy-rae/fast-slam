@@ -18,7 +18,7 @@ MEASUREMENT_NOISE = np.array([[0.01, 0.0], [0.0, 0.01]])
 # E.g. a landmark is associated to a known landmark if the covariance of the known landmark is [[0.01, 0], [0, 0.01]]
 # and the euclidian distance between the known landmark and the observed landmark is smaller than 1.
 # An euclidian distance of 1 with this cov. would be a mahalanobis distance of 10.
-MAXIMUM_LANDMARK_DISTANCE = 10
+MAXIMUM_LANDMARK_DISTANCE = 8
 
 # Number of cores used for parallel updating of particles
 NUM_CORES = 28

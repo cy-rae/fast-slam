@@ -94,7 +94,7 @@ class MapUtils:
         # Axis labels
         ax.set_xlabel('x-axis')
         ax.set_ylabel('y-axis')
-        ax.text(-11, 11, "Map created by the fast_slam_2 2.0 algorithm", fontsize=12, color='black')
+        ax.text(-11, 11, "Map created by the FastSLAM 2.0 algorithm", fontsize=12, color='black')
         ax.grid(True)  # Show grid
 
         return fig, ax

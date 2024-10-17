@@ -1,4 +1,6 @@
-﻿import HAL
+﻿import time
+
+import HAL
 import numpy as np
 
 
@@ -17,13 +19,13 @@ def move() -> tuple[int, int]:
         # If the robot hits the wall, the angular velocity will be set depending on the bumper that was hit
         bumper = HAL.getBumperData().bumper
         if bumper == 0:  # right bumper
-            w = 1
+            w = 0.5
         else:  # left or center bumper
-            w = -1
+            w = -0.5
 
     # If the robot does not hit the wall, the linear and angular velocities will be set to 1 and 0 respectively
     else:
-        v = 1
+        v = 0.5
         w = 0
 
     # Set the linear and angular velocity of the robot
@@ -43,11 +45,10 @@ while True:
 
     timestamp = HAL.getLaserData().timeStamp
     delta_t = timestamp - prev_timestamp
-    prev_timestamp = timestamp
 
     # Calculate the displacement of the robot
     d_ang = w * delta_t
-    d_lin = v * delta_t / 2
+    d_lin = v * delta_t * 0.6
 
     # Update the position of the robot
     yaw = (yaw + d_ang + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
@@ -55,11 +56,18 @@ while True:
     y += d_lin * np.sin(yaw)
 
     # Print the updated position of the robot
-    print('\nYAW', yaw)
-    print('ACTUAL YAW', HAL.getPose3d().yaw)
+    # print('\ndisplacement', d_lin, delta_t)
+    # print('Timestamps', timestamp, prev_timestamp)
+    prev_timestamp = timestamp
+
+    # # Print the updated position of the robot
+    # print('\nYAW', yaw)
+    # print('ACTUAL YAW', HAL.getPose3d().yaw)
 
     print('\nX', x)
     print('ACTUAL X', HAL.getPose3d().x + 1)
 
-    print('\nY', y)
-    print('ACTUAL Y', HAL.getPose3d().y - 1.5)
+    # print('\nY', y)
+    # print('ACTUAL Y', HAL.getPose3d().y - 1.5)
+
+    time.sleep(0.7)

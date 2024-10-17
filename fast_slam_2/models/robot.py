@@ -133,7 +133,7 @@ class Robot(DirectedPoint):
 
         # Calculate the linear and angular displacement of the robot
         d_ang = w * dt
-        d_lin = v * dt / 2
+        d_lin = v * dt * 0.6 # Calculate the linear displacement of the robot in cm/s instead of m/min
 
         # Set the linear or angular displacement to 0 if the robot is not moving or rotating
         if v == 0:

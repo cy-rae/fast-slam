@@ -68,22 +68,26 @@ class FastSLAM2:
         # Return the estimated position of the robot
         return self.__estimate_robot_position()
 
-    def __move_particle(self, index: int, d_lin: float, rotation: float, TRANSLATION_NOISE: float,
+    def __move_particle(self, index: int, d_lin: float, d_ang: float, TRANSLATION_NOISE: float,
                         ROTATION_NOISE: float):
         """
         Update the particle (determined by the passed index) based on the passed translation vector and rotation.
         :param index: The index of the particle in the particle list
         :param d_lin: The translation vector of the robot
-        :param rotation: The rotation angle of the robot in radians
+        :param d_ang: The rotation angle of the robot in radians
         """
         # Apply uncertainty to the movement of the robot and particles using random Gaussian noise with the standard deviations
-        d_lin += np.random.normal(0, TRANSLATION_NOISE)
-        rotation += np.random.normal(0, ROTATION_NOISE)
+        if d_ang != 0:
+            translation = 0
+            rotation = d_ang + np.random.normal(0, ROTATION_NOISE)
+        else:
+            translation = d_lin + np.random.normal(0, TRANSLATION_NOISE)
+            rotation = 0
 
         self.particles[index].yaw = (self.particles[index].yaw + rotation + np.pi) % (
                 2 * np.pi) - np.pi  # Ensure yaw stays between -pi and pi
-        self.particles[index].x += d_lin * np.cos(self.particles[index].yaw)
-        self.particles[index].y += d_lin * np.sin(self.particles[index].yaw)
+        self.particles[index].x += translation * np.cos(self.particles[index].yaw)
+        self.particles[index].y += translation * np.sin(self.particles[index].yaw)
 
     @staticmethod
     def __update_particle(particle: Particle, measurement: Measurement, MEASUREMENT_NOISE: np.ndarray):
@@ -197,23 +201,6 @@ class FastSLAM2:
         The estimation is based on the mean of the particles.
         :return: Returns the estimated position of the robot as a tuple (x, y, yaw)
         """
-        # x_mean = 0.0 TODO CHECK IF THIS IS BETTER
-        # y_mean = 0.0
-        # yaw_mean = 0.0
-        # total_weight = sum(p.weight for p in self.particles)
-        #
-        # # Calculate the mean of the particles
-        # for p in self.particles:
-        #     x_mean += p.x * p.weight
-        #     y_mean += p.y * p.weight
-        #     yaw_mean += p.yaw * p.weight
-        #
-        # # Normalize the estimated position
-        # x_mean /= total_weight
-        # y_mean /= total_weight
-        # yaw_mean /= total_weight
-        # yaw_mean = (yaw_mean + np.pi) % (2 * np.pi) - np.pi  # Ensure yaw is between -pi and pi
-
         # Get the particle with the biggest weight
         best_particle = max(self.particles, key=lambda p: p.weight)
 

@@ -5,7 +5,6 @@ The map is stored in a JSON file, which is deserialized in this script.
 The robot, particles, and landmarks are then plotted on a 2D grid.
 """
 import os
-import time
 
 from utils.deserializer import Deserializer
 from utils.map_utils import MapUtils
@@ -34,6 +33,3 @@ if __name__ == "__main__":
         if len(obstacles) > 0:
             # Plot the obstacles
             MapUtils.create_map(obstacles)
-
-        # Wait for a second before updating the map
-        time.sleep(0.5)

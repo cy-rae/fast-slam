@@ -96,18 +96,13 @@ class EvaluationUtils:
             round(distance, 4)
         )
 
-        # TODO: REMOVE THIS PRINT STATEMENT AFTER TESTING
-        print("\nX", EvaluationUtils.__actual_pos.x, estimated_pos.x)
-        print("Y", EvaluationUtils.__actual_pos.y, estimated_pos.y)
-        print("Yaw", EvaluationUtils.__actual_pos.yaw, estimated_pos.yaw)
-
         # Print the validation results
-        print(f"\nTimestamp: {results.timestamp}%")
+        print(f"\nTimestamp: {results.timestamp}")
         print(f"Average deviation: {results.average_deviation}%")
         print(f"X deviation: {results.x_deviation}%")
         print(f"Y deviation: {results.y_deviation}%")
         print(f"Angular deviation: {results.angular_deviation}%")
-        print(f"Distance between actual and estimated position: {results.distance}%")
+        print(f"Distance between actual and estimated position: {results.distance}m")
 
         return results, EvaluationUtils.__actual_pos
 
