@@ -43,7 +43,7 @@ This separation offloads the map generation process from the robot,
 keeping the computational load of the FastSLAM 2.0 implementation low.
 This ensures performance and thus also the accuracy of localization.
 
-### FastSLAM 2.0
+### FastSLAM 2.0 module
 The FastSLAM 2.0 implementation is located in the `fast_slam_2` module.
 It consists of model, utility, and algorithm classes, along with a configuration file, which will be explained in the following sections.
 
@@ -75,4 +75,21 @@ The `fast_slam_2/models` folder contains the model classes used in the FastSLAM 
 #### Utils classes
 The `fast_slam_2/utils` folder contains utility classes used in the FastSLAM 2.0 implementation:
 - `GeometryUtils`: Provides methods to calculate geometric properties (e.g. mahalanobis distance, clustering, ...).
-- `LandmarkUtils`: P
+- `LandmarkUtils`: Provides methods to manage landmarks (e.g. update, association ...).
+- `EvaluationUtils`: Provides methods to evaluate the FastSLAM 2.0 algorithm results.
+- `Serializer`: Provides methods to serialize the models to JSON files which will be stored in the shared folder.
+
+#### Algorithm classes
+The `fast_slam_2/algorithms` folder contains algorithm classes used in the FastSLAM 2.0 implementation:
+- `LineFilter`: Implements the line filter to enhance line features in a point cloud.
+- `ICP`: Implements the Iterative Closest Point algorithm to align two point clouds. 
+This is not being used in the current implementation because it is better to calculate the transformation from the robot's movement.
+- `HoughTransformation`: Implements the Hough Transformation to detect lines and intersections in a point cloud.
+- `FastSLAM2`: Implements the FastSLAM 2.0 algorithm.
+
+### Mapping module
+The `landmark_map` module is used to generate landmark maps from the JSON files produced by the FastSLAM 2.0 implementation. 
+Therefore, the `landmark_map/main.py` manages the process to read the JSON files from the shared folder and to generate the landmark maps.
+The JSON files can be deserialized by the `Deserializer` class in the `landmark_map/utils` folder.
+The deserialized data is then used to generate the landmark maps. 
+The map generation is implemented in the `MapUtils` class in the `landmark_map/utils` folder.
