@@ -1,8 +1,9 @@
 ﻿"""
 This script is used to plot the map created by the FastSLAM 2.0 algorithm.
-The FastSLAM 2.0 algorithm creates a map of the environment using a robot, particles, and landmarks.
+The FastSLAM 2.0 algorithm creates a map of the environment using the estimated robot pose, actual robot pose, particles,
+landmarks and evaluation results.
 The map is stored in a JSON file, which is deserialized in this script.
-The robot, particles, and landmarks are then plotted on a 2D grid.
+The estimated robot pose, actual robot pose, particles, landmarks and evaluation results are then plotted on a 2D grid.
 """
 import os
 
