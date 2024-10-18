@@ -59,15 +59,8 @@ class LandmarkUtils:
                 min_samples=1  # The number of samples in a neighborhood for a point to be considered as a core point
             )
 
-        # Get the corners which represent the landmarks TODO
-        # return LandmarkUtils.__get_corners(intersection_points, filtered_points, threshold=0.1)
-
-        # Convert the intersection points to landmarks
-        landmarks = []
-        for intersection_point in intersection_points:
-            landmarks.append(Landmark(intersection_point[0], intersection_point[1], np.array([[0.1, 0], [0, 0.1]])))
-
-        return landmarks
+        # Get the corners which represent the landmarks
+        return LandmarkUtils.__get_corners(intersection_points, filtered_points, threshold=0.1)
 
     @staticmethod
     def __get_corners(
