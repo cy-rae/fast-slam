@@ -5,7 +5,8 @@ from matplotlib.axes import Axes
 
 class MapUtils:
     """
-    Utils class to plot the map with the robot, particles, landmarks and obstacles/borders.
+    Utils class to plot the map with the estimated robot pose, actual robot pose, particles and landmarks plot the
+    evaluation results.
     """
 
     @staticmethod
@@ -17,7 +18,7 @@ class MapUtils:
             results: dict[str, float or str]
     ):
         """
-        Plot the map with the robot, particles, landmarks and obstacles/borders.
+        Plot the map with the estimated robot pose, actual robot pose, particles, landmarks and evaluation results.
         :param actual_robot_pos: The actual robot position represented as a tuple (x, y, yaw)
         :param estimated_robot_pos: The estimated robot position represented as a tuple (x, y, yaw)
         :param particles: The particles represented as a list of tuples (x, y, yaw)
@@ -25,6 +26,7 @@ class MapUtils:
         :param results: The evaluation results represented as a dictionary
         """
         try:
+            # Initialize the plot
             fig, ax = MapUtils.__init_plot()
 
             # Plot the estimated robot position as a red arrow
@@ -37,7 +39,7 @@ class MapUtils:
                 label='Estimated robot position'
             )
 
-            # Plot the actual robot position as a red arrow
+            # Plot the actual robot position as a black arrow
             MapUtils.__plot_as_arrows(
                 ax,
                 directed_points=[actual_robot_pos],
@@ -69,7 +71,7 @@ class MapUtils:
             # Add the legend below the plot
             ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), fancybox=True, shadow=True, ncol=1)
 
-            # Add the results as text under the plot
+            # Add the evaluation results as text under the plot
             MapUtils.__add_results_text(fig, results)
 
             # Show the plot
@@ -146,7 +148,7 @@ class MapUtils:
         Plot the passed points as dots. The color of the dots is determined by the passed color parameter.
         :param ax: The axis to plot the dots on
         :param points: This list contains all the points which will be represented as dots in the map
-        :param color: The color of the dot ('k' -> black, 'g' -> green)
+        :param color: The color of the dot ('g' -> green)
         :param zorder: The zorder of the dot that determines the order of the elements in the plot
         :param label: The label of the dot that will be shown in the legend
         """
